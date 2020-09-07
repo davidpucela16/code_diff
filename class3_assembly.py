@@ -4,7 +4,7 @@ Created on Thu Sep  3 10:11:47 2020
 
 @author: david
 """
-
+###NEW VERSION GITHUB
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -30,7 +30,7 @@ class Assembly(Grid):
         #For the initial simulation 
         self.c_0=1
         self.t=parameters["t"] #vector with the IDs of the tissue
-        self.linear_consumtion=parameters["linear_consumption"]
+        self.M=parameters["linear_consumption"]
         
         #index of source, ind cell it is in, Edge it belongs to 
         source=parameters["s"]
@@ -39,6 +39,7 @@ class Assembly(Grid):
         self.s=self.s.astype(int)
         self.L=np.max(self.s.shape)*self.h_network
         self.Dirichlet=0
+        
         
         #vessel
         self.u=parameters["velocity"]   #velocity in the blood network     
@@ -113,6 +114,16 @@ class Assembly(Grid):
                 self.a[i,i+1]-=1
                 self.phi_tissue[i]+=self.BCw[ypos]*self.hx
             return(self.phi_tissue[i])
+            
+    def is_on_boundary_1D(self, k, v_len):
+        """this function just evaluates if the cell is not on the boundary (return(0)), if it 
+        is at the beginning of the vessel (return(1), or at the end (return(2)))"""
+        if k==0:
+            return(1)
+        elif k==v_len-1:
+            return(2)
+        else:
+            return(0)
     
     def assembly(self):
         #Matrix creation        
@@ -147,13 +158,15 @@ class Assembly(Grid):
             pos_aC=int(i[1])
             self.i=i
             self.pos_BD=pos_BD
-            if p==0: #this belongs to the initial boundary of the vessel
-                self.D[p,p]=1
-                self.phi_vessels[p]=self.BC_vessels[0] #the result for this unkown is fixed
+            n=self.is_on_boundary_1D(p, self.len_net)
+            if n==1: #this belongs to the initial boundary of the vessel
+                self.D[p,p]=-1
+                self.D[p,p+1]=1
+                self.phi_vessels[p]=self.BC_vessels[0] #the gradient of concentration is fixed
             elif p==self.len_net-1:
                 self.D[p,p]+=1
                 self.phi_vessels[p]=self.BC_vessels[1] #the flux for this unknown is fixed
-                self.D[p,p-1]=1
+                self.D[p,p-1]-=1
             else:
                 self.D[p,p+1]=fwd #the coefficients depend strongly on the velocity, and the velocity is given by the 
                 self.D[p,p-1]=bcw #edge/vessel. The edge/vessel is given by the third column of the source term (self.s)
@@ -183,7 +196,7 @@ class Assembly(Grid):
         #linear, homogeneous diffusion coefficients:
         N=S=D/hx**2
         E=W=D/hx**2
-        C=-4*D/hx**2
+        C=-4*D/hx**2-self.M
         """This loop will go over every value of phi[0]. This values represent the indices
         of the vector itself. It would have been the same to do for i in range(len(phi[0])).
         The purpose of the loop is go through every cell (phi[0]), and determine if there is 
@@ -194,12 +207,14 @@ class Assembly(Grid):
             if self.is_on_boundary(i): #Check if the FV cell i is on the boundary
                                        #Will only work on a structured mesh 
                 b=0
-                self.Flux_BC(i)
+                self.Dirichlet_BC(i)
             else:
                 #No boundary 
                 b=1
-                self.a[i,i]=C
-                self.a[i,i+1]=self.a[i,i-1]=E
-                self.a[i,i+self.xlen]=self.a[i,i-self.xlen]=N
+                self.a[i,i]+=C
+                self.a[i,i+1]+=E
+                self.a[i,i-1]+=W
+                self.a[i,i+self.xlen]+=S
+                self.a[i,i-self.xlen]+=N
 
         return(self.a)

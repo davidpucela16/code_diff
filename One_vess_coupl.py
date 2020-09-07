@@ -33,29 +33,29 @@ def unit_vec(p1,p2):
 
 #geometrical/topological parameters:
 dim=2
-h=1
+h=0.5
 hx=hy=h
-h_network=0.5
-domain_x=5
-domain_y=5
+h_network=0.25
+domain_x=3
+domain_y=3
 start_x=0
 start_y=0
-inc_t=0.1
+inc_t=0.01
 
 parameters_geom={"inc_t":inc_t,"dim":dim,"h":h, "hx":hx, "hy":hy, "h_network":h_network,"domain_x":domain_x,"domain_y":domain_y, "start_x":start_x, "start_y":start_y}
 
 
 #physical parameters:
-Diff_tissue=5
+Diff_tissue=1
 Diff_blood=0.5
-Permeability=10
-linear_consumption=1
+Permeability=1
+linear_consumption=0
 
 coord=np.array([[0.2,0.6],[0.7,0.55]])
 coord[:,0]*=domain_x
 coord[:,1]*=domain_y
 
-velocity=np.random.random()*4
+velocity=2
 Network=pd.DataFrame([[coord[0],0],[coord[1],[0,1,2]]],columns=["coordinates","adjacency"])
 Edges=pd.DataFrame([[(0,1),dist(coord[0],coord[1]),1,velocity, unit_vec(coord[0],coord[1])]],columns=["vertices","length","diameter","velocity","unit vector"])
 number_edges=len(Edges)
@@ -107,16 +107,19 @@ for i in l:
     if c==1:
         print("matrix B by rows")
         for j in range(int(i)):
+            print("row: ", j)
             print(k.B[j,:])
             print()
     if c==2:
         print("matrix C by rows")
         for j in range(int(i)):
+            print("row: ", j)
             print(k.C[j,:])
             print()
     if c==3:
         print("matrix D by rows")
         for j in range(int(i)):
+            print("row: ", j)
             print(k.D[j,:])
             print()
     c+=1    
@@ -173,11 +176,21 @@ A=np.concatenate((A,B))
 phi=np.concatenate((k.phi_tissue,k.phi_vessels))
     
 
-sol=solve_lin_sys(A,phi,50,inc_t,k.xlen,k.ylen)
+sol=solve_lin_sys(A,phi,1000,inc_t,k.xlen,k.ylen)
 m,_=sol.shape
-for i in range(1,m):
+for i in range(1,m,100):
     plot_solution(sol[i,:],k.xlen,k.ylen,k.X,k.Y)
+
+
+k.D[...]=0
+for i in range(k.D.shape[0]):
+    k.D[i,i]=1
     
+k.phi_vessels=np.zeros(7)+5
+
+k.C[...]=0
+
+
     
 
 
