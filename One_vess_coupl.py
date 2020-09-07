@@ -191,6 +191,15 @@ k.phi_vessels=np.zeros(7)+5
 k.C[...]=0
 
 
+
+def plot_solution_vessel(sol, xlen, ylen,C):
+    phi_tissue=sol[:(xlen*ylen)]
+    phi_vessel=sol[(xlen*ylen):]
+    plt.plot(phi_vessel, label='vessel')
+    
+    coupl=C.dot(phi_tissue)-np.identity(len(phi_vessel)).dot(phi_vessel)
+    plt.plot(coupl, label='flux out')
+    plt.legend()
     
 
 
