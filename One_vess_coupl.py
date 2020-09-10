@@ -36,11 +36,11 @@ dim=2
 h=0.5
 hx=hy=h
 h_network=0.25
-domain_x=3
-domain_y=3
+domain_x=7
+domain_y=7
 start_x=0
 start_y=0
-inc_t=0.01
+inc_t=0.001
 
 parameters_geom={"inc_t":inc_t,"dim":dim,"h":h, "hx":hx, "hy":hy, "h_network":h_network,"domain_x":domain_x,"domain_y":domain_y, "start_x":start_x, "start_y":start_y}
 
@@ -51,7 +51,7 @@ Diff_blood=0.5
 Permeability=1
 linear_consumption=0
 
-coord=np.array([[0.2,0.6],[0.7,0.55]])
+coord=np.array([[0.3,0.3],[0.7,0.65]])
 coord[:,0]*=domain_x
 coord[:,1]*=domain_y
 
@@ -82,7 +82,7 @@ BCw=np.zeros(p1.y.shape)
 
 BC=[BCn,BCs,BCe,BCw]
 
-BC_vessels=np.array([9,0])
+BC_vessels=np.array([2,1])
 
 conditions={"BC_tissue":BC, "BC_vessels":BC_vessels, "IC_tissue":IC_tissue, "IC_vessels":IC_vessels}
 parameters.update(conditions)
@@ -90,39 +90,42 @@ parameters.update(conditions)
 k=Assembly(parameters) #initialization of the object
 k.assembly()
 
-l=np.zeros(4)
-
-l[0],_=k.a.shape
-l[1],_=k.B.shape
-l[2],_=k.C.shape
-l[3],_=k.D.shape
-
-c=0
-for i in l:
-    if c==0:
-        print("matrix a by rows")
-        for j in range(int(i)):
-            print(k.a[j,:].reshape(k.ylen,k.xlen))
-            print()
-    if c==1:
-        print("matrix B by rows")
-        for j in range(int(i)):
-            print("row: ", j)
-            print(k.B[j,:])
-            print()
-    if c==2:
-        print("matrix C by rows")
-        for j in range(int(i)):
-            print("row: ", j)
-            print(k.C[j,:])
-            print()
-    if c==3:
-        print("matrix D by rows")
-        for j in range(int(i)):
-            print("row: ", j)
-            print(k.D[j,:])
-            print()
-    c+=1    
+#==============================================================================
+#This short script is to print out the matrices. Quite useful for doing test and finding bugs
+# l=np.zeros(4)
+# 
+# l[0],_=k.a.shape
+# l[1],_=k.B.shape
+# l[2],_=k.C.shape
+# l[3],_=k.D.shape
+# 
+# c=0
+# for i in l:
+#     if c==0:
+#         print("matrix a by rows")
+#         for j in range(int(i)):
+#             print(k.a[j,:].reshape(k.ylen,k.xlen))
+#             print()
+#     if c==1:
+#         print("matrix B by rows")
+#         for j in range(int(i)):
+#             print("row: ", j)
+#             print(k.B[j,:])
+#             print()
+#     if c==2:
+#         print("matrix C by rows")
+#         for j in range(int(i)):
+#             print("row: ", j)
+#             print(k.C[j,:])
+#             print()
+#     if c==3:
+#         print("matrix D by rows")
+#         for j in range(int(i)):
+#             print("row: ", j)
+#             print(k.D[j,:])
+#             print()
+#     c+=1    
+#==============================================================================
     
 
 def iterate_fweul(A,phi, inc_t):  
@@ -164,46 +167,59 @@ def plot_solution(phi,xlen,ylen,X,Y):
     plt.title("Heat line source")
     plt.savefig("solution.pdf")
     plt.show()
+#==============================================================================
+#     phi=phi[:(xlen*ylen)]
+#     plt.figure()
+#     C=np.reshape(phi,(k.ylen,k.xlen))
+#     t=C
+#     plt.imshow(t[::-1,:], vmin=0, vmax=2)
+#     plt.colorbar()
+#     plt.show    
+#==============================================================================
+    
+    
     return()
 
-###Concatenation
-    
-A=np.concatenate((k.a,k.B),axis=1)
-B=np.concatenate((k.C,k.D),axis=1)
-A=np.concatenate((A,B))
-
-#A is the full matrix  
-phi=np.concatenate((k.phi_tissue,k.phi_vessels))
-    
-
-sol=solve_lin_sys(A,phi,1000,inc_t,k.xlen,k.ylen)
-m,_=sol.shape
-for i in range(1,m,100):
-    plot_solution(sol[i,:],k.xlen,k.ylen,k.X,k.Y)
-
-
-k.D[...]=0
-for i in range(k.D.shape[0]):
-    k.D[i,i]=1
-    
-k.phi_vessels=np.zeros(7)+5
-
-k.C[...]=0
-
-
-
-def plot_solution_vessel(sol, xlen, ylen,C):
-    phi_tissue=sol[:(xlen*ylen)]
-    phi_vessel=sol[(xlen*ylen):]
-    plt.plot(phi_vessel, label='vessel')
-    
-    coupl=C.dot(phi_tissue)-np.identity(len(phi_vessel)).dot(phi_vessel)
-    plt.plot(coupl, label='flux out')
-    plt.legend()
-    
-
-
-
+#==============================================================================
+# ###Concatenation
+#     
+# A=np.concatenate((k.a,k.B),axis=1)
+# B=np.concatenate((k.C,k.D),axis=1)
+# A=np.concatenate((A,B))
+# 
+# #A is the full matrix  
+# phi=np.concatenate((k.phi_tissue,k.phi_vessels))
+#     
+# 
+# sol=solve_lin_sys(A,phi,10000,inc_t,k.xlen,k.ylen)
+# m,_=sol.shape
+# for i in range(1,m,100):
+#     plot_solution(sol[i,:],k.xlen,k.ylen,k.X,k.Y)
+# 
+# 
+#     
+# 
+# 
+# 
+# 
+# 
+# def plot_solution_vessel(sol, xlen, ylen,C):
+#     phi_tissue=sol[:(xlen*ylen)]
+#     phi_vessel=sol[(xlen*ylen):]
+#     plt.plot(phi_vessel, label='vessel')
+#     
+#     coupl=C.dot(phi_tissue)-np.identity(len(phi_vessel)).dot(phi_vessel)
+#     plt.plot(coupl, label='flux out')
+#     plt.legend()
+#     
+#         
+#     
+#     return(phi_vessel)
+#     
+# 
+# 
+# 
+#==============================================================================
 
 
 

@@ -148,6 +148,7 @@ class Assembly(Grid):
         fwd=Db/hn**2-self.u/(2*hn)   #i+1 coefficient for the discretized adv-diff equation
         bcw=Db/hn**2+self.u/(2*hn)   #i-1 coefficient for the discretized adv-diff equation
         cntr=-2*Db/(hn**2)    #i coefficient for the disc....
+        
         (self.fwd, self.bcw, self.cntr)=(fwd,bcw,cntr)
         
         
@@ -160,12 +161,11 @@ class Assembly(Grid):
             self.pos_BD=pos_BD
             n=self.is_on_boundary_1D(p, self.len_net)
             if n==1: #this belongs to the initial boundary of the vessel
-                self.D[p,p]=-1
-                self.D[p,p+1]=1
-                self.phi_vessels[p]=self.BC_vessels[0] #the gradient of concentration is fixed
+                self.D[p,p]=1
+                self.phi_vessels[p]=self.BC_vessels[1] #the gradient of concentration is fixed
             elif p==self.len_net-1:
                 self.D[p,p]+=1
-                self.phi_vessels[p]=self.BC_vessels[1] #the flux for this unknown is fixed
+                self.phi_vessels[p]=self.BC_vessels[0] #the flux for this unknown is fixed
                 self.D[p,p-1]-=1
             else:
                 self.D[p,p+1]=fwd #the coefficients depend strongly on the velocity, and the velocity is given by the 
