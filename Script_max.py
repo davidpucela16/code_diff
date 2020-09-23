@@ -1,7 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-Created on Thu Sep 17 19:14:42 2020
+Created on Fri Sep 18 20:41:14 2020
 
+@author: david
+"""
+
+
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Sep 17 19:14:42 2020
 @author: david
 """
 
@@ -10,7 +17,8 @@ import numpy as np
 import matplotlib.pyplot as plt 
 import matplotlib.patches as mpatches
 
-def plot(z,r, inc_z, inc_r, xlen, ylen):
+
+def plot(z,r, inc_z, inc_r,C,Z,Rho,Rv):
     fig=plt.figure()
     ax=fig.gca()
     ax.set(xlim=(z[0],z[-1]),ylim=(r[0],r[-1]))
@@ -24,7 +32,7 @@ def plot(z,r, inc_z, inc_r, xlen, ylen):
        
     
     #Test
-    theta=np.isclose(C%10,6)
+    theta=np.isclose(Rho+0.1,Rv,inc_r/2)
     v1=np.zeros(len(theta))
     v2=np.zeros(len(theta))
     c=0
@@ -41,172 +49,279 @@ def plot(z,r, inc_z, inc_r, xlen, ylen):
     plt.show()
     #plt.plot(v1,v2)
 
+def plot_solution(solution, geom, iteration):
+    zlen=geom["zlen"]
+    rlen=geom["rlen"]
+    Z=geom["Z"]
+    Rho=geom["Rho"]
+    sol=np.reshape(solution,(rlen,zlen))
+    plt.figure
+    #To fix the amount of contour levels COUNTOUR LEVELS
+    limit=np.ceil(np.max(sol)-np.min(sol))
+    breaks=np.linspace(0,np.max(sol),10)
 
+    C=sol
+    plt.contourf(Z,Rho,C,breaks, cmap="Reds")
+    plt.colorbar(ticks=breaks, orientation="vertical")
+    print("minimum: ", np.min(sol))
+    print("max: ", np.max(sol))
+    
+    
+    plt.xlabel("z")
+    plt.ylabel("r")
+    plt.grid()
+    plt.title("Coupled diffusion")
+    plt.savefig("solution.pdf")
+    plt.show()
+    
+    
+    
+    return()
+    
+    
+class domain():
+    def __init__(self,z,r, coeffs, parameteres, typ):
+        self.typ=typ
+        CN,CS,CE,CW=coeffs
+        self.Z,self.Rho=np.meshgrid(z,r)
+        rlen, zlen=self.Z.shape
+        C=np.zeros(self.Z.shape)
+        
+        C[0,:]+=10*CS
+        C[-1,:]+=CN
+        C[:,0]+=1000*CW
+        C[:,-1]+=100*CE
+        phi=np.ndarray.flatten(C)
+        
+        self.C=C.astype(np.int)
+        self.z=z
+        self.r=r
+        self.rlen=rlen
+        self.zlen=zlen
+        
+        phi=np.ndarray.flatten(self.C)
+        self.phi=phi
+        
+        K=parameters["coeff_vel"]
+        Rv=parameters["R_vessel"]
+        self.vel=np.around(K*(Rv**2-self.r**2))
+        self.vel[np.where(self.vel<0)]=0
+        
+        if self.typ=="vessel":
+            self.D=parameters["Diff_vessel"]
+        elif self.typ=="tissue":
+            self.D=parameters["Diff_tissue"]
+        else:
+            print("you introduced the type wrong but because I dont know yet how to do exceptions you have to re run the code yourself")
+        
+        
+    
+        
+CN,CS,CE,CW=1,2,3,4
+coeffs=(CN,CS,CE,CW)
 
-CN,CS,CE,CW,MN,MS=1,2,3,4,6,7
-
-Dv=1
+Dv=10
 Dt=1
-K_m=2
-inc_r=0.1
-inc_z=0.1
+K_m=1
+inc_r=1
+inc_z=3
 
 lamb=0.5
-L=2
-Rm=1
-Rv=0.5
-K=10
-Mt=2
+L=9
+Rm=6 #MAX RADIUS
+Rv=3
+K=1
+Mt=0
+inlet_c=1
 
 parameters={"Diff_vessel": Dv, "Diff_tissue": Dt, "Permeability": K_m, "inc_rho": inc_r, "inc_z": inc_z,
-            "R_max": Rm, "R_vessel": Rv, "Length": L, "Tissue_consumption":Mt}
+            "R_max": Rm, "R_vessel": Rv, "Length": L, "Tissue_consumption":Mt, "coeff_vel":K, "inlet_concentration":inlet_c}
 
 
 z=np.arange(0,L,inc_z) 
-r=np.arange(0,Rm,inc_r) 
-Z,Rho=np.meshgrid(z,r) #Coordinatees
-rlen, zlen=Z.shape
+rv=np.arange(inc_r/2,Rv,inc_r) 
+rt=np.arange(np.max(rv)+inc_r,Rm,inc_r) 
+#total radius
+r=np.append(rv,rt)
 
-b=int(np.nonzero(np.isclose(Rv,r))[0])+1
+vessel=domain(z,rv,coeffs, parameters, "vessel")
+tissue=domain(z,rt,coeffs, parameters, "tissue")
 
-Vel=K*(Rv**2-r[:b+1]**2)
 
-new={"vel_prof": W}
-parameters.update(new)
+#new={"vel_prof": Vel}
+#parameters.update(new)
 
-phi=np.ndarray.flatten(C)
-phi = phi.astype(np.int)
-phi_v=phi[:(b*zlen)]
-
+#plot(z,r, inc_z, inc_r, len(z), len(r))
 
 
 
-C=np.zeros(Z.shape)
-
-C[0,:]+=10*S
-C[-1,:]+=N
-C[:,0]+=1000*W
-C[:,-1]+=100*E
-C[Rv/inc_r,:]=MN
-C[Rv/inc_r+1,:]=MS
-
-
-
-
-
-
-
-
-plot(z,r, inc_z, inc_r, xlen, ylen)
-
-
-
-#FOR TISSUE
-#if north is not a boundary 
-cntrl-=Dt*((r[i]+inc_r/2)/(inc_r**2*r[i]))
-n+=Dt*((r[i]+inc_r/2)/(inc_r**2*r[i]))
-
-#if south is not a boundary
-cntrl-=Dt*((r[i]-inc_r/2)/(inc_r**2*r[i]))
-s+=Dt*((r[i]-inc_r/2)/(inc_r**2*r[i]))
-
-#if east is not a boundary
-cntrl-=Dt/inc_z**2
-e+=Dt/inc_z**2
-
-#if west is not a boundary
-cntrl-=Dt/inc_z**2
-w+=Dt/inc_z**2
-
-
-zlen,rlen=Z.shape
-Rvi=int(Rv/inc_r+1)
-
-phi=np.ndarray.flatten(C)
-
-phi_v=phi[:(zlen*Rvi)]
-
-c=0
-A=np.zeros((len(phi),len(phi)))
-for i in phi:
-    Diff_flux_north,Diff_flux_south,Diff_flux_east,Diff_flux_west,Diff_flux_membrane,tissue_consumption, \
-    Conv_flux_east, Conv_flux_West=1,1,1,1,0,Mt,1,1
-    if i//1000==CW:
-        Diff_flux_west=0
-        Conv_flux_west=0
-    elif (i%1000)//100==CE:
-        Diff_flux_east=0
-    elif (i%100)//10==CS:
-        Diff_flux_south==0
-    elif (i%10)==CN:
-        Diff_flux_north=0
-    elif (i%10)==MN:
-        Diff_flux_membrane=1
-    elif (i%10)==MS:
-        Diff_flux_membrane=2
-    elif c<Rvi*zlen:
-        tissue_consumtion=0
-        
-    #radial coordinate (int)
-    ir=c//zlen
-    #axial coordinate (int)
-    iz=c%zlen
+#   ASSEMBLY VESSEL MATRIX
+def assembly(obj):
+    c=0
+    main=np.zeros((len(obj.phi),len(obj.phi)))
+    if obj.typ=="tissue":
+        coupl=np.zeros((len(obj.phi),len(vessel.phi)))
+    elif obj.typ=="vessel":
+        coupl=np.zeros((len(vessel.phi),len(tissue.phi)))
     
-    if radius<=Rv:
-        Mt=0
-        Vel=parameters["vel_prof"]
-        D=parameters["Diff_vessel"]
-    elif radiu>Rv:
-        Mt=parameters["Tissue_consumption"]
-        Vel=0
-        D=parameters["Diff_tissue"]
+    for i in obj.phi:
+        D=obj.D
+        Vel=obj.vel
+        Diff_flux_north,Diff_flux_south,Diff_flux_east,Diff_flux_west, \
+        Conv_flux_east, Conv_flux_west=1,1,1,1,1,1
+        #axial coordinate (int)    
+        iz=c%obj.zlen
+        #radial coordinate (int)
+        ir=c//obj.zlen
+        
+        N,S,E,W,cntrl=0,0,0,0,0
+        
+        if (i%1000)//100==CE:
+            Diff_flux_east=0
+            print("no flux east", c)
+        if (i%100)//10==CS:
+            Diff_flux_south=0
+            print("no flux south", c)
+            if obj.typ=="tissue":
+                coupl[c,vessel.zlen*(vessel.rlen-1)+iz]+=K_m
+                cntrl-=K_m
+        if (i%10)==CN:
+            Diff_flux_north=0
+            print("no flux north", c)
+            if obj.typ=="vessel":
+                coupl[c,iz]+=K_m
+                cntrl-=K_m
+        if i//1000==CW and obj.typ=="vessel":
+            Diff_flux_west=0
+            Conv_flux_west=0
+            Diff_flux_north=0
+            Diff_flux_south=0
+            Diff_flux_east=0
+            print("no flux west", c)
+        if i//1000==CW and obj.typ=="tissue":
+            Diff_flux_west=0
+            
+        print("sequence of fluxes")    
+        print(Diff_flux_north,Diff_flux_south,Diff_flux_east,Diff_flux_west, \
+        Conv_flux_east, Conv_flux_west)
+        
+        if Diff_flux_north:
+            cntrl-=(r[ir]+inc_r)*D/(r[ir]*inc_r**2)
+            N=(r[ir]+inc_r)*D/(r[ir]*inc_r**2)
+            main[c,c+obj.zlen]+=N
+            print("in diff north")
+        if Diff_flux_south:
+            cntrl-=(r[ir]-inc_r)*D/(r[ir]*inc_r**2)
+            S=(r[ir]-inc_r)*D/(r[ir]*inc_r**2)
+            main[c,c-obj.zlen]+=S
+            print("in diff south")
+        if Diff_flux_east:
+            cntrl-=D/inc_z**2
+            E=D/inc_z**2 
+            main[c,c+1]+=E
+            print("in diff east")
+        if Diff_flux_west:
+            cntrl-=D/inc_z**2
+            W=D/inc_z**2 
+            main[c,c-1]+=W
+            print("in diff west")
+        if Conv_flux_east:
+            cntrl-=Vel[ir]/(inc_z)
+            print("in conv east")
+        if Conv_flux_west:
+            W=Vel[ir]/(inc_z)
+            main[c,c-1]+=W
+            print("in conv west")
+    
+            
+        main[c,c]=cntrl        
+        #Coupling
+        c+=1
+        
+        obj.main=main
+        obj.coupl=coupl
+        
+    if obj.typ=="tissue":
+        return(np.append(coupl,main, axis=1))
+    elif obj.typ=="vessel":
+        return(np.append(main, coupl, axis=1))
     else:
-        #membrane
-        D=0
-        Vel=0
-        Mt=0
-        
-    N,S,E,W,cntrl=0,0,0,0,0
-    if Diff_flux_north:
-        cntrl-=(r[ir]+inc_r)*D/(r[ir]*inc_r**2)
-        N+=(r[ir]+inc_r)*D/(r[ir]*inc_r**2)
-    elif Diff_flux_south:
-        cntrl-=(r[ir]-inc_r)*D/(r[ir]*inc_r**2)
-        S+=(r[ir]-inc_r)*D/(r[ir]*inc_r**2)
-    elif Diff_flux_east:
-        cntrl-=D/inc_z**2
-        E+=D/inc_z**2 
-    elif Diff_flux_west:
-        cntrl-=D/inc_z**2
-        W+=D/inc_z**2 
-    elif Conv_flux_east:
-        cntrl-=W[ir]/(2*inc_z)
-        E-=W[ir]/(2*inc_z)
-    elif Conv_flux_west:
-        cntrl+=W[ir]/(2*inc_z)
-        W+=W[ir]/(2*inc_z)
-    elif tissue_consumption:
-        cntrl+=Mt
-        
-    A[c,c]=cntrl        
-    A[c,c+1]=E  
-    A[c,c-1]=W
-    A[c,c+zlen]=N
-    A[c,c-zlen]=S
+        print("wrong type introduced")
     
-    if Diff_flux_membrane:
-        if Diff_flux_membrane==1:
-            #membrane in the north, tissue
-            A[c,c+zlen]=K_m*lamb
-            A[c,c]-=K_m
-        elif Diff_flux_membrane==2:
-            #membrane in the south 
-            A[c,c-zlen]=K_m
-            A[c,c]-=K_m*lamb
-    
-    c+=1
 
+# =============================================================================
+# #Superuseful to visualize the matrix of coefficients
+# for i in vessel.main:
+#     print("")
+#     n=i.reshape(vessel.rlen, vessel.zlen)[::-1,:]
+#     n=np.around(n,decimals=1)
+#     print(n)
+# =============================================================================
+
+assembly(tissue)
+assembly(vessel)
+
+Up=np.append(vessel.main, vessel.coupl, axis=1)
+Down=np.append(tissue.coupl, tissue.main, axis=1)
+
+
+A=np.append(Up, Down, axis=0)
+geom={"zlen":vessel.zlen,"rlen":(vessel.rlen+tissue.rlen),"Z":np.append(vessel.Z,tissue.Z,axis=0),\
+      "Rho":np.append(vessel.Rho,tissue.Rho,axis=0)}
+ 
+ 
+#Set Dirichlet inlet BCs:
+vessel.phi[:]=0
+i=0
+inlet=parameters["inlet_concentration"]
+while i<len(vessel.phi):
+    vessel.phi[i]=inlet
     
+    A[i,:vessel.zlen]=0
+    A[i,i]=1
+    i+=vessel.zlen
+
+tissue.phi=np.zeros(len(tissue.phi))
+phi_total=np.append(vessel.phi, tissue.phi)
     
+# =============================================================================
+# 
+# for i in range(Rvi+1):
+#     #Setting Dirichlet BC
+#     o=zlen*i
+#     A[o,:]=0
+#     A[o,o]=1
+#     phi[o]=2
+#     
+# 
+# geom={"zlen":zlen,"rlen":rlen,"Z":Z,"Rho":Rho}
+# =============================================================================
+
+inc_t=0.001
+def fwdEuler(A,phi,inc_t):
+    inc_phi=A.dot(phi)*inc_t
+    return(phi+inc_phi)
+
+def iterate(iterations, A, phi, inc_t,n):
+    sol=fwdEuler(A,phi,inc_t)
+    i=0
+    while i<len(vessel.phi):
+        vessel.phi[i]=inlet 
+        A[i,:vessel.zlen]=0
+        A[i,i]=1
+        i+=vessel.zlen
+    
+    for i in range(iterations):
+        if i in range(0,iterations,n):
+            print(i)
+            plot_solution(sol, geom, i)
+        sol=fwdEuler(A,sol,inc_t)
+    return(sol)
+        
+
+a=iterate(10000, A, phi_total, inc_t, 1000)
+
+
+
 
 
