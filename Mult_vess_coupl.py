@@ -7,8 +7,8 @@ Created on Fri Oct 23 15:31:05 2020
 
 from class1_domain import Grid 
 #from class2 import Solver
-from class3_solver import Solver_t
-from class3_assembly import Assembly
+#from class3_solver import Solver_t
+#from class3_assembly import Assembly
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -179,9 +179,8 @@ parameters={}; parameters.update(parameters_geom); parameters.update(parameters_
 b=int(np.where(Network["Boundary_P"].values==0)[0]) #vertex which is not in the boundary, hence it must be a bifurcation
 
 bif_edges=Network.loc[b,"Edges"]
-
-bifurcation=2
-boundary=1
+h_network=p1.h
+parameters["h_network"]=h_network
 
 source["bifurcation?"]=p1.vertices
 

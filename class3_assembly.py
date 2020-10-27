@@ -34,15 +34,16 @@ class Assembly(Grid):
         self.c_0=1
         self.t=parameters["t"] #vector with the IDs of the tissue
         self.M=parameters["linear_consumption"]
-               
+        self.D_eff=Edges["eff_diff"]
+        self.U_eff=Edges["eff_velocity"]
         
         
         #index of source, ind cell it is in, Edge it belongs to 
         source=parameters["s"]
         IC_vessels=source["IC"]
-        self.s=np.array([np.arange(len(source)),source["ind cell"],source["Edge"], IC_vessels]).T
+        self.s=np.array([np.arange(len(source)),source["ind cell"],source["Edge"], IC_vessels, source["bifurcation?"]]).T
         self.s=self.s.astype(int)
-        self.ps=pd.DataFrame(self.s, columns=["ind_cell","ind_FV_Cell","ind_Edge","BCenc"])
+        self.dfs=source
         self.L=np.max(self.s.shape)*self.h_network
         #Boundary info:
         self.boundary_vessel(source)
@@ -66,19 +67,9 @@ class Assembly(Grid):
         
     
     def bifurcation_law(self):
+        return()
         
-    
-            
-    def is_on_boundary_1D(self, k, v_len):
-        """this function just evaluates if the cell is not on the boundary (return(0)), if it 
-        is at the beginning of the vessel (return(1), or at the end (return(2)))"""
-        if k==0:
-            return(1)
-        elif k==v_len-1:
-            return(2)
-        else:
-            return(0)
-    
+
     def assembly(self):
         #Matrix creation        
         self.len_tissue=self.IC_tissue.size
@@ -98,12 +89,9 @@ class Assembly(Grid):
         
         #coeffs for the equation in blood -----> SOURCES (MATRICES B, C and D)
         hn=self.h_network  #discretization step of the network 
-        Db=self.D_blood    #diffusion coefficient of blood
-        fwd=Db/hn**2-self.u/(2*hn)   #i+1 coefficient for the discretized adv-diff equation
-        bcw=Db/hn**2+self.u/(2*hn)   #i-1 coefficient for the discretized adv-diff equation
-        cntr=-2*Db/(hn**2)    #i coefficient for the disc....
-        
-        (self.fwd, self.bcw, self.cntr)=(fwd,bcw,cntr)
+        Db=self.D_eff    #diffusion coefficient of blood
+        Ub=self.U_eff
+
         
         
         #loop for the coupling and the source
@@ -113,18 +101,23 @@ class Assembly(Grid):
             pos_aC=int(i[1]) #value of the FV (tissue) cell
             self.i=i
             self.pos_BD=pos_BD
-            n=self.is_on_boundary_1D(p, self.len_net)
+            n=i[4]
+            e=i[2] #Number of the edge this cell belongs to 
             if n==1: #this belongs to the initial boundary of the vessel
                 self.D[p,p]=1
                 self.phi_vessels[p]=self.BC_vessels[1] #the gradient of concentration is fixed
-            elif p==self.len_net-1:
+            elif n
                 self.D[p,p]+=1
                 self.phi_vessels[p]=self.BC_vessels[0] #the flux for this unknown is fixed
                 self.D[p,p-1]-=1
-            else:
-                self.D[p,p+1]=fwd #the coefficients depend strongly on the velocity, and the velocity is given by the 
-                self.D[p,p-1]=bcw #edge/vessel. The edge/vessel is given by the third column of the source term (self.s)
-                self.D[p,p]+=cntr
+            elif n==-1:
+                #There are both fluxes east and west, diffusive and convective
+                #Flux east
+                self.D[p,p-1]+=(1/hn[e])*(Ub[e]+Db[e]/hn[e]) #edge/vessel. The edge/vessel is given by the third column of the source term (self.s)
+                self.D[p,p]-=Db/(hn[e]**2)
+                #Flux west
+                self.D[p,p+1]+=Db[e]/(hn[e]**2)#the coefficients depend strongly on the velocity, and the velocity is given by the 
+                self.D[p,p]-=(Ub[e]/hn[e])+Db/(hn[e]**2)
                 #Now, for the coupling part of the matrix (matrices B and C)
 #==============================================================================
 #           in case there is need for an imposed linear decay             
