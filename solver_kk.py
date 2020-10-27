@@ -20,6 +20,22 @@ for i in range(len(k.phi_tissue)):
         k.phi_tissue[i]=0
     else:
         k.phi_tissue[i]=0
+        
+
+def plot_solution_vessel(sol, xlen, ylen,C):
+    plt.figure()
+    phi_tissue=sol[:(xlen*ylen)]
+    phi_vessel=sol[(xlen*ylen):]
+    plt.plot(phi_vessel, label='vessel')
+    
+    coupl=C.dot(phi_tissue)-np.identity(len(phi_vessel)).dot(phi_vessel)
+    plt.plot(coupl, label='flux out')
+    plt.legend()
+    plt.show
+    
+        
+    
+    return(phi_vessel)		
 
 
 def iterate_fweul(A,phi, inc_t):  
@@ -98,18 +114,5 @@ for i in range(1,m,100):
 
 
 
-def plot_solution_vessel(sol, xlen, ylen,C):
-    plt.figure()
-    phi_tissue=sol[:(xlen*ylen)]
-    phi_vessel=sol[(xlen*ylen):]
-    plt.plot(phi_vessel, label='vessel')
-    
-    coupl=C.dot(phi_tissue)-np.identity(len(phi_vessel)).dot(phi_vessel)
-    plt.plot(coupl, label='flux out')
-    plt.legend()
-    plt.show
-    
-        
-    
-    return(phi_vessel)
+
     

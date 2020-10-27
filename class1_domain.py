@@ -30,6 +30,7 @@ class Grid():
         
         corner=np.empty(2)
         self.dim=parameters["dim"]
+        self.coeffs=parameters["coeffs"]
         
 # =============================================================================
 #       This first loop is here to create a rectangular grid with the input 
@@ -52,6 +53,9 @@ class Grid():
         self.y=np.arange(parameters["start_y"],parameters["start_y"]+self.domain_y+self.hy,self.hy) 
         x=self.x
         y=self.y
+        
+        self.h=np.zeros(len(Edges))
+        self.vertices=np.array([])
         
 
         
@@ -104,8 +108,24 @@ class Grid():
         _,self.ylen,self.xlen=np.shape(self.Cord)        
         self.C=C
         phi1=np.arange(C[0].size)  #Array carrying the ID of each cell
-        self.t=phi1 #Array carrying the ID of each cell
+        self.t=pd.DataFrame(phi1, columns=["ind_cell"]) #Array carrying the ID of each cell
+        
+        #Boundary encryption 
+        CN,CS,CE,CW=self.coeffs
+        
+        B=np.zeros([self.xlen, self.ylen])
+        B[0,:]+=10*CS
+        B[-1,:]+=CN
+        B[:,0]+=1000*CW
+        B[:,-1]+=100*CE
+        
+        B=np.ndarray.flatten(B)
+        self.t["BCenc"]=B
+        
+        
         return()
+        
+    
         
         
     
@@ -134,8 +154,11 @@ class Grid():
         #ax.set(xlim=(self.x[0],self.x[-1]),ylim=(self.y[0],self.y[-1]))
         for i in range(len(L)):  #loop that goes through each edge
             lamb=self.Edges.loc[i,"unit vector"]  #unit vector for this specific edge
-            s=np.arange(0,L[i],h_network) #parametrization coordinate for this vessel i   
+            s=np.linspace(0,L[i],L[i]//h_network) #parametrization coordinate for this vessel i   
+            self.h[i]=s[1]-s[0]
             p0=self.b[i,:,0] 
+            
+            
             
             for j in s:
                 px,py=p0+lamb*j+h_network/2 #cartesian coordinates of the center of the segment (of size h_network) 
@@ -150,6 +173,12 @@ class Grid():
                 self.s=self.s.append(pd.DataFrame([[ind,i]], columns=self.s.columns), ignore_index=True) 
                 
                 self.c+=1
+                if j==s[-1]: #Last vertex of the vessel, therefore it is recorded
+                    self.vertices=np.append(self.vertices, self.Edges.loc[i,"vertices"][1])
+                elif j==s[0]: #first vertex of the vessel, therefore it is recorded
+                    self.vertices=np.append(self.vertices, self.Edges.loc[i,"vertices"][0])
+                else:
+                    self.vertices=np.append(self.vertices, -1)
         #plt.show()
                 
         self.theta=np.unique(self.s["ind cell"])

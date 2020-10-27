@@ -24,7 +24,7 @@ class Solver_t():
         self.D_tissue=D_tissue
         #For the initial simulation 
         self.c_0=1
-        self.t=t #vector with the IDs of the tissue
+        self.t=t #DF with the IDs of the tissue and boundaries
         
         #index of source, ind cell it is in, Edge it belongs to 
         self.s=np.array([np.arange(len(source)),source["ind cell"],source["Edge"], IC_vessels]).T

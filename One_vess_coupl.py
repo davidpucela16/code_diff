@@ -41,8 +41,9 @@ domain_y=7
 start_x=0
 start_y=0
 inc_t=0.001
+coeffs=(1,2,3,4)
 
-parameters_geom={"inc_t":inc_t,"dim":dim,"h":h, "hx":hx, "hy":hy, "h_network":h_network,"domain_x":domain_x,"domain_y":domain_y, "start_x":start_x, "start_y":start_y}
+parameters_geom={"inc_t":inc_t,"dim":dim,"h":h, "hx":hx, "hy":hy, "h_network":h_network,"domain_x":domain_x,"domain_y":domain_y, "start_x":start_x, "start_y":start_y, "coeffs":coeffs}
 
 
 #physical parameters:
@@ -64,6 +65,8 @@ number_edges=len(Edges)
 p1=Grid(parameters_geom, Network, Edges)
 s=p1.plot()  #here the function parametrize is included
 
+
+
 new={"x":[np.min(p1.x),np.max(p1.x)], "y":[np.min(p1.y),np.max(p1.y)], "s":p1.s, "t":p1.t}
 parameters_geom.update(new)
 parameters_physical={"linear_consumption":linear_consumption,"D_tissue":Diff_tissue, "D_blood":Diff_blood, "Permeability":Permeability, "velocity":velocity}
@@ -73,6 +76,8 @@ parameters={}; parameters.update(parameters_geom); parameters.update(parameters_
 #IC
 IC_vessels=np.zeros(len(p1.s))
 IC_tissue=np.zeros(np.shape(p1.Cord[0]))
+
+
 
 #BCs:
 BCn=np.zeros(p1.x.shape)
