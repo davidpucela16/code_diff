@@ -103,14 +103,14 @@ class Assembly(Grid):
             self.pos_BD=pos_BD
             n=i[4]
             e=i[2] #Number of the edge this cell belongs to 
-            if n==1: #this belongs to the initial boundary of the vessel
+            if n==1: #this belongs to the Bifurcation
                 self.D[p,p]=1
                 self.phi_vessels[p]=self.BC_vessels[1] #the gradient of concentration is fixed
             elif n
                 self.D[p,p]+=1
                 self.phi_vessels[p]=self.BC_vessels[0] #the flux for this unknown is fixed
                 self.D[p,p-1]-=1
-            elif n==-1:
+            elif n==-1 and Ub[e]>0:
                 #There are both fluxes east and west, diffusive and convective
                 #Flux east
                 self.D[p,p-1]+=(1/hn[e])*(Ub[e]+Db[e]/hn[e]) #edge/vessel. The edge/vessel is given by the third column of the source term (self.s)

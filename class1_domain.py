@@ -154,14 +154,15 @@ class Grid():
         #ax.set(xlim=(self.x[0],self.x[-1]),ylim=(self.y[0],self.y[-1]))
         for i in range(len(L)):  #loop that goes through each edge
             lamb=self.Edges.loc[i,"unit vector"]  #unit vector for this specific edge
-            s=np.linspace(0,L[i],L[i]//h_network) #parametrization coordinate for this vessel i   
+            s=np.linspace(0,L[i],int(L[i]//h_network)) #parametrization coordinate for this vessel i 
+            s=s[1:]
             self.h[i]=s[1]-s[0]
             p0=self.b[i,:,0] 
             
             
             
             for j in s:
-                px,py=p0+lamb*j+h_network/2 #cartesian coordinates of the center of the segment (of size h_network) 
+                px,py=p0+lamb*j #cartesian coordinates of the center of the segment (of size h_network) 
                 mx=self.Cordx-px
                 my=self.Cordy-py
                 ind=np.argmin((mx**2+my**2)) #index of the cell this segment is in 
@@ -172,13 +173,7 @@ class Grid():
                 #if this function were not to be called there would be no source
                 self.s=self.s.append(pd.DataFrame([[ind,i]], columns=self.s.columns), ignore_index=True) 
                 
-                self.c+=1
-                if j==s[-1]: #Last vertex of the vessel, therefore it is recorded
-                    self.vertices=np.append(self.vertices, self.Edges.loc[i,"vertices"][1])
-                elif j==s[0]: #first vertex of the vessel, therefore it is recorded
-                    self.vertices=np.append(self.vertices, self.Edges.loc[i,"vertices"][0])
-                else:
-                    self.vertices=np.append(self.vertices, -1)
+
         #plt.show()
                 
         self.theta=np.unique(self.s["ind cell"])

@@ -81,8 +81,10 @@ def from_Q_get_avgV(Edges, P):
     velocity=np.zeros(len(Edges))
     for i in range(len(Edges)):
         cond, diam=Edges.loc[i,"conductance"],Edges.loc[i,"diameter"]     
-        ver1,ver2=Edges.loc[i,"vertices"]
-        velocity[i]=np.abs(ver1-ver2)*4*cond/(np.pi*diam**2)
+        P1,P2=Edges.loc[i,"vertices"]
+        #Important to notice which is ver1 and ver2 cause that will indicate the positive sense of the effective velocity
+        #If the velocity is positive, blood flows from lower index vertex to higher index vertex.
+        velocity[i]=(P[0]-P[1])*4*cond/(np.pi*diam**2)
     return(velocity)
 
 def eff_vel(array):
@@ -117,36 +119,36 @@ Diff_blood=0.5
 Permeability=1
 linear_consumption=0
 
-coord=np.array([[0.3,0.3],[0.7,0.65],[0.9,0.9],[0.8,0.1]])
-coord[:,0]*=domain_x
-coord[:,1]*=domain_y
+init=np.array([0,1,1])
+fin=np.array([1,2,3])
+cordx=np.array([0.3, 0.7,0.9,0.8])*domain_x
+cordy=np.array([0.3, 0.65,0.9,0.1])*domain_y
 
 d=[1,0.4,0.6]
 velocity=np.zeros(len(d))
 
 
-Network=pd.DataFrame([[coord[0],1, "Inlet"],[coord[1],[0,2,3], "No"],[coord[2],1, "Outlet"], [coord[3],1, "Outlet"]],\
+Network=pd.DataFrame([[[cordx[0],cordy[0]],1, "Inlet"],[[cordx[1],cordy[1]],[0,2,3], "No"],[[cordx[2],cordy[2]],1, "Outlet"], [[cordx[3],cordy[3]],1, "Outlet"]],\
 columns=["coordinates","adjacency", "boundary"])
 
-Edges=pd.DataFrame([[(0,1),dist(coord[0],coord[1]),d[0],velocity[0], unit_vec(coord[0],coord[1]),\
-funct(d[0],dist(coord[0],coord[1])) ]] ,columns=["vertices","length","diameter","velocity","unit vector", "conductance"])
+Edges=pd.DataFrame([[(0,1),dist(Network.loc[init[0],"coordinates"],Network.loc[fin[0],"coordinates"]),d[0],velocity[0], unit_vec(Network.loc[init[0],"coordinates"],Network.loc[fin[0],"coordinates"]),\
+funct(d[0],dist(Network.loc[init[0],"coordinates"],Network.loc[fin[0],"coordinates"])) ]] ,columns=["vertices","length","diameter","velocity","unit vector", "conductance"])
 
 number_edges=len(Edges)
 
 Network["Edges"]=[0,[0,1,2], 1,2]
 
-Edges=Edges.append(pd.DataFrame([[(1,2),dist(coord[1],coord[2]),d[1],velocity[1], unit_vec(coord[1],coord[2]), funct(d[1],dist(coord[1],coord[2])) ]],columns=["vertices","length","diameter","velocity","unit vector", "conductance"]), ignore_index=True)
-Edges=Edges.append(pd.DataFrame([[(1,3),dist(coord[1],coord[3]),d[2],velocity[2], unit_vec(coord[1],coord[3]), funct(d[2],dist(coord[1],coord[2])) ]],columns=["vertices","length","diameter","velocity","unit vector", "conductance"]), ignore_index=True)
-
-
-
-
-
+Edges=pd.DataFrame()
+for i in range(len(init)):
+    Edges=Edges.append(pd.DataFrame([[[init[i],fin[i]],dist(Network.loc[init[i],"coordinates"],Network.loc[fin[i],"coordinates"]),d[i],velocity[i], unit_vec(Network.loc[init[i],"coordinates"],Network.loc[fin[i],"coordinates"]),\
+    funct(d[i],dist(Network.loc[init[i],"coordinates"],Network.loc[fin[i],"coordinates"])) ]] ,columns=["vertices","length","diameter","velocity","unit vector", "conductance"]), ignore_index=True)
 
 
 ### THE SCRIPT BEGINS HERE, THE INFO BEFORE IS COMMONLY ALREADY OBTAINED FROM WHATEVER NETWORK DATA WE ARE USING
 
-BCs={"Outlet":4, "Inlet":6}
+BCs={"Outlet":8, "Inlet":1}
+
+
 k=flow_solver( Edges,Network, BCs)
 
 Pressure_array=k.get_pressure()
@@ -182,11 +184,11 @@ bif_edges=Network.loc[b,"Edges"]
 h_network=p1.h
 parameters["h_network"]=h_network
 
-source["bifurcation?"]=p1.vertices
 
 
 
 
-k=Assembly(parameters, Edges)
+
+#k=Assembly(parameters, Edges)
 
 
