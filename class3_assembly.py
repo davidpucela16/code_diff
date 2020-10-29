@@ -41,12 +41,12 @@ class Assembly(Grid):
         #index of source, ind cell it is in, Edge it belongs to 
         source=parameters["s"]
         IC_vessels=source["IC"]
-        self.s=np.array([np.arange(len(source)),source["ind cell"],source["Edge"], IC_vessels, source["bifurcation?"]]).T
+        self.s=np.array([np.arange(len(source)),source["ind cell"],source["Edge"], IC_vessels]).T
         self.s=self.s.astype(int)
         self.dfs=source
-        self.L=np.max(self.s.shape)*self.h_network
-        #Boundary info:
-        self.boundary_vessel(source)
+        self.num_cells_edge=((Edges["length"]/h_network).values).astype(int)
+        
+        
         
         
         #vessel
@@ -69,6 +69,21 @@ class Assembly(Grid):
     def bifurcation_law(self):
         return()
         
+    def flux_int(self, pos_tis, pos_net, pos_net_east, pos_net_west, e):
+        hn=self.h_network[e]
+        #Diffusive:
+        self.D[pos_net,pos_net]-=2/(hn**2)*self.Edges.loc[e,"eff_diff"]
+        self.D[pos_net,pos_net_east]+=1/(hn**2)*self.Edges.loc[e,"eff_diff"]
+        self.D[pos_net,pos_net_west]+=1/(hn**2)*self.Edges.loc[e,"eff_diff"]
+        #Convective
+        self.D[pos_net,pos_net_west]-=self.Edges.loc[e,"eff_velocity"]/(2*hn)
+        self.D[pos_net,pos_net_east]+=self.Edges.loc[e,"eff_velocity"]/(2*hn)
+        
+        self.D[pos_net, pos_net]-=self.K_eff
+        self.C[pos_net,pos_tis]+=self.K0
+        
+        return()         
+        
 
     def assembly(self):
         #Matrix creation        
@@ -89,53 +104,37 @@ class Assembly(Grid):
         
         #coeffs for the equation in blood -----> SOURCES (MATRICES B, C and D)
         hn=self.h_network  #discretization step of the network 
-        Db=self.D_eff    #diffusion coefficient of blood
-        Ub=self.U_eff
 
-        
-        
+        c=0 #counter 
         #loop for the coupling and the source
         for i in self.s: #Loop going through each of the network (of vessels) cells
             p=i[0] #Identifier for the discretized cell of the vessel (the first column has the ID of the cell)
-            pos_BD=int(p) #the position of this cell in the matrix Value of the cell at the vascular level
-            pos_aC=int(i[1]) #value of the FV (tissue) cell
-            self.i=i
-            self.pos_BD=pos_BD
-            n=i[4]
+            pos_net=int(p) #the position of this cell in the matrix Value of the cell at the vascular level
+            pos_tis=int(i[1]) #value of the FV (tissue) cell
+            self.pos_net=pos_net
             e=i[2] #Number of the edge this cell belongs to 
-            if n==1: #this belongs to the Bifurcation
-                self.D[p,p]=1
-                self.phi_vessels[p]=self.BC_vessels[1] #the gradient of concentration is fixed
-            elif n
-                self.D[p,p]+=1
-                self.phi_vessels[p]=self.BC_vessels[0] #the flux for this unknown is fixed
-                self.D[p,p-1]-=1
-            elif n==-1 and Ub[e]>0:
-                #There are both fluxes east and west, diffusive and convective
-                #Flux east
-                self.D[p,p-1]+=(1/hn[e])*(Ub[e]+Db[e]/hn[e]) #edge/vessel. The edge/vessel is given by the third column of the source term (self.s)
-                self.D[p,p]-=Db/(hn[e]**2)
-                #Flux west
-                self.D[p,p+1]+=Db[e]/(hn[e]**2)#the coefficients depend strongly on the velocity, and the velocity is given by the 
-                self.D[p,p]-=(Ub[e]/hn[e])+Db/(hn[e]**2)
-                #Now, for the coupling part of the matrix (matrices B and C)
-#==============================================================================
-#           in case there is need for an imposed linear decay             
-#              else:
-#                 self.A[pos_A,pos_A]=1
-#                 self.phi[pos_A]=(self.BC_vessels[1]-self.BC_vessels[0])*p/len(self.s) #the result for this unknown is fixed    
-#==============================================================================
+            N=self.num_cells_edge[e] #numbers of cells this edge has
+            if c==0: #first cell (after vertex) of vessel 
+                pos_vertex=self.len_net-len(self.cordx)+self.init[e] #Position of the vertex in the source vector 
+                pos_net_west=pos_vertex
+                pos_net_east=pos_net+1
+                c+=1
+            elif c==N-1: #Last cell before bifurcation/boundary vertex
+                pos_vertex=self.len_net-len(self.cordx)+self.fin[e]
+                pos_net_east=pos_vertex
+                pos_net_west=pos_net-1
+                c=0
+            else: #Intermediate vertex
+                pos_net_east=pos_net+1
+                pos_net_west=pos_net-1
+                c+=1
                 
-                #This two blocks are not indented because I do not want to change the coefficients of the matrix
-                #if we are dealing with the boundary cells of the network
-                
-                self.D[p, p]-=self.K0
-                self.C[p,pos_aC]+=self.K0
-                
-    
+            self.flux_int(self, pos_tis, pos_net, pos_net_east, pos_net_west, e)
+        
             #This two blocks are not indented because even the boundary nodes will diffuse to the tissue
-            self.a[pos_aC,pos_aC]-=self.K0*hn/(self.hx*self.hy)
-            self.B[pos_aC, p]+=self.K0*hn/(self.hx*self.hy)  #i[1] represents the FV cell of tissue
+            self.a[pos_tis,pos_tis]-=self.K0*hn[e]/(self.hx*self.hy)
+            self.B[pos_tis, pos_net]+=self.K0*hn[e]/(self.hx*self.hy)  
+            
             
         D=self.D_tissue #tissue diffusion coefficient
         hx,hy=self.hx,self.hy

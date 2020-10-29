@@ -124,6 +124,9 @@ fin=np.array([1,2,3])
 cordx=np.array([0.3, 0.7,0.9,0.8])*domain_x
 cordy=np.array([0.3, 0.65,0.9,0.1])*domain_y
 
+cords=np.array([cordx,cordy])
+edge=np.array([init,fin])
+
 d=[1,0.4,0.6]
 velocity=np.zeros(len(d))
 
@@ -163,32 +166,34 @@ Edges["eff_perm"]=eff_perm(Permeability,len(Edges))
 
 
 
-p1=Grid(parameters_geom, Network, Edges)
+p1=Grid(parameters_geom, Network, Edges, cords, edge)
 s=p1.plot()  #here the function parametrize is included
 
 
 
 source=p1.s
 IC_vessels=np.zeros(len(source))
-IC_vessels[0]=2
+IC_vessels[np.where(p1.s["Edge"]==-1)]=2
 source["IC"]=IC_vessels
 new={"x":[np.min(p1.x),np.max(p1.x)], "y":[np.min(p1.y),np.max(p1.y)], "s":source, "t":p1.t}
 parameters_geom.update(new)
 parameters_physical={"linear_consumption":linear_consumption,"D_tissue":Diff_tissue}
 parameters={}; parameters.update(parameters_geom); parameters.update(parameters_physical)
 
-#The bifurcations need to be encoded somehow, and be differentiated from the boundary nodes and from the other nodes
-b=int(np.where(Network["Boundary_P"].values==0)[0]) #vertex which is not in the boundary, hence it must be a bifurcation
-
-bif_edges=Network.loc[b,"Edges"]
-h_network=p1.h
-parameters["h_network"]=h_network
-
-
-
-
+#==============================================================================
+# #The bifurcations need to be encoded somehow, and be differentiated from the boundary nodes and from the other nodes
+# b=int(np.where(Network["Boundary_P"].values==0)[0]) #vertex which is not in the boundary, hence it must be a bifurcation
+# 
+# bif_edges=Network.loc[b,"Edges"]
+# h_network=p1.h
+#==============================================================================
+parameters["h_network"]=p1.h
 
 
-#k=Assembly(parameters, Edges)
+
+
+
+
+k=Assembly(parameters, Edges)
 
 
