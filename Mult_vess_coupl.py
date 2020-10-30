@@ -8,7 +8,7 @@ Created on Fri Oct 23 15:31:05 2020
 from class1_domain import Grid 
 #from class2 import Solver
 #from class3_solver import Solver_t
-#from class3_assembly import Assembly
+from class3_assembly import Assembly
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -191,9 +191,9 @@ parameters["h_network"]=p1.h
 
 
 
+parameters["IC_tissue"]=np.zeros([p1.xlen*p1.ylen])
 
 
-
-k=Assembly(parameters, Edges)
+k=Assembly(parameters, Edges, init, fin                                                                                                                                                                                                                         )
 
 

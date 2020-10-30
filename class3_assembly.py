@@ -17,7 +17,7 @@ import pandas as pd
 class Assembly(Grid):
     
     
-    def __init__(self, parameters, Edges):
+    def __init__(self, parameters, Edges, init, fin):
                
         self.dim=parameters["dim"]
         self.hx,self.hy=parameters["hx"],parameters["hy"]
@@ -44,29 +44,42 @@ class Assembly(Grid):
         self.s=np.array([np.arange(len(source)),source["ind cell"],source["Edge"], IC_vessels]).T
         self.s=self.s.astype(int)
         self.dfs=source
-        self.num_cells_edge=((Edges["length"]/h_network).values).astype(int)
+        self.num_cells_edge=((Edges["length"]/self.h_network).values).astype(int)
         
         
+        
+        self.init=init
+        self.fin=fin
         
         
         #vessel
         #These two arrays should have as many values as edges in the network since the effective convective and dispersive 
         #coefficients are gonna be different in each vessel
-        self.u_network=Edges["eff_vel"] #effective velocity in the blood network 
+        self.u_network=Edges["eff_velocity"] #effective velocity in the blood network 
         self.D_network=Edges["eff_diff"]
     
         
         
         self.IC_vessels=self.s[:,3]
-        self.BC_vessels=parameters["BC_vessels"] #MODIFY LATER
         self.IC_tissue=np.ndarray.flatten(parameters["IC_tissue"])
-        self.BCn=parameters["BC_tissue"][0]
-        self.BCs=parameters["BC_tissue"][1]
-        self.BCe=parameters["BC_tissue"][2]
-        self.BCw=parameters["BC_tissue"][3]
+
         
     
-    def bifurcation_law(self):
+    def bifurcation_law(self, vertex):
+        #For intersections
+        #Flux east
+        a=np.where(self.init==vertex) #Edges that have this vertex as beginning
+        #we search the first vertex in the source vector. They are ordered, so the position
+        #will be the addition of the length of all the values in the previous vertices
+        for i in np.array([a]):
+            pos_s=np.sum(self.num_cells_edge[:i]) #position of the first (second) surface of the vessel
+            self.flux_int()
+      
+        
+        b=np.where(self.fin==vertex)
+        return()
+        
+        np.sum
         return()
         
     def flux_int(self, pos_tis, pos_net, pos_net_east, pos_net_west, e):
@@ -130,10 +143,13 @@ class Assembly(Grid):
                 c+=1
                 
             self.flux_int(self, pos_tis, pos_net, pos_net_east, pos_net_west, e)
+            
+            
+            self.bifurcation_law()
         
             #This two blocks are not indented because even the boundary nodes will diffuse to the tissue
-            self.a[pos_tis,pos_tis]-=self.K0*hn[e]/(self.hx*self.hy)
-            self.B[pos_tis, pos_net]+=self.K0*hn[e]/(self.hx*self.hy)  
+            self.a[pos_tis,pos_tis]-=self.K_eff*hn[e]/(self.hx*self.hy)
+            self.B[pos_tis, pos_net]+=self.K_eff*hn[e]/(self.hx*self.hy)  
             
             
         D=self.D_tissue #tissue diffusion coefficient
