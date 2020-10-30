@@ -193,7 +193,27 @@ parameters["h_network"]=p1.h
 
 parameters["IC_tissue"]=np.zeros([p1.xlen*p1.ylen])
 
+#I need to give it a vector with the inlet and outlet boundary nodes
+def encode_boundary_vessels(source, Network):
+    a=np.zeros(np.shape(source)[0])
+    boundary=Network["boundary"]
+    c=0
+    for i in source.values: 
+        b=int(i[1])
+        if b>=0:
+            a[c]=0
+        if b<0:
+            vertex=-b-1
+            if boundary[vertex]=="No":
+                a[c]=2
+            elif boundary[vertex]=="Inlet":
+                a[c]=1
+            elif boundary[vertex]=="Outlet":
+                a[c]=3
+        c+=1
+    return(a)
 
-k=Assembly(parameters, Edges, init, fin                                                                                                                                                                                                                         )
+new={"boundary":encode_boundary_vessels(source,Network)}
+parameters.update(new)
 
-
+k=Assembly(parameters, Edges, init, fin, parameters["boundary"])

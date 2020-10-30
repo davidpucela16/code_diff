@@ -17,7 +17,7 @@ import pandas as pd
 class Assembly(Grid):
     
     
-    def __init__(self, parameters, Edges, init, fin):
+    def __init__(self, parameters, Edges, init, fin, boundary):
                
         self.dim=parameters["dim"]
         self.hx,self.hy=parameters["hx"],parameters["hy"]
@@ -44,10 +44,10 @@ class Assembly(Grid):
         self.s=np.array([np.arange(len(source)),source["ind cell"],source["Edge"], IC_vessels]).T
         self.s=self.s.astype(int)
         self.dfs=source
-        self.num_cells_edge=((Edges["length"]/self.h_network).values).astype(int)
+        self.num_cells_edge=((Edges["length"]/self.h_network).values).astype(int)-1
         
-        
-        
+        self.boundary=boundary
+        self.diam=Edges["diameter"]
         self.init=init
         self.fin=fin
         
@@ -63,26 +63,55 @@ class Assembly(Grid):
         self.IC_vessels=self.s[:,3]
         self.IC_tissue=np.ndarray.flatten(parameters["IC_tissue"])
 
+    def upwind_scheme_downstream_flux(self, pos_net, pos_frw, factor):
+        e=self.s[pos_frw,2]
+        self.D[pos_net,pos_net]+=(-self.D_eff[e]/self.h_network[e]-np.max([self.U_eff[e],0]))*(2*self.diam[e]**2)/factor
+        self.D[pos_net,pos_frw]+=(self.D_eff[e]/self.h_network[e]+np.max([-self.U_eff[e],0]))*(2*self.diam[e]**2)/factor
+        return()
+    
+    def upwind_scheme_upstream_flux(self, pos_net, pos_bcw, factor):
+        e=self.s[pos_bcw,2]
+        self.D[pos_net,pos_net]+=(-self.D_eff[e]/self.h_network[e]-np.max([-self.U_eff[e],0]))*(2*self.diam[e]**2)/factor
+        self.D[pos_net,pos_bcw]+=(self.D_eff[e]/self.h_network[e]+np.max([self.U_eff[e],0]))*(2*self.diam[e]**2)/factor
+        return()
         
     
     def bifurcation_law(self, vertex):
         #For intersections
         #Flux east
         a=np.where(self.init==vertex) #Edges that have this vertex as beginning
+        b=np.where(self.fin==vertex) 
+        factor=(self.Edges.loc[np.append(a,b),"diameter"]**2).dot(self.h_network[np.append(a,b)])
         #we search the first vertex in the source vector. They are ordered, so the position
         #will be the addition of the length of all the values in the previous vertices
-        for i in np.array([a]):
+        for i in np.array([a]): #Goes through each of the EDGES that have "vertex" as initial vertex 
             pos_s=np.sum(self.num_cells_edge[:i]) #position of the first (second) surface of the vessel
-            self.flux_int()
-      
-        
-        b=np.where(self.fin==vertex)
+            pos_net_vertex=-1-vertex
+            self.upwind_scheme_downstream_flux(pos_net_vertex, pos_s, factor)
+            
+        for i in np.array([b]):
+            pos_s=np.sum(self.num_cells_edge[:i+1])-1 #position of the last surface of the vessel
+            pos_net_vertex=-1-vertex
+            self.upwind_scheme_upstream_flux(pos_net_vertex, pos_s, factor)
+            
         return()
         
-        np.sum
+    def boundary_set(self, vertex, boundary_vector, position_in_vector):
+        #If boundary[position_in_vector]=1 -> Inlet, =2 -> Bifurcation, -> =3 Vein outlet
+        if boundary_vector[position_in_vector]==1:
+            self.D[position_in_vector,position_in_vector]=1
+        elif boundary_vector[position_in_vector]==3:
+            e=np.where[self.fin==vertex] #edge
+            pos_bcw=np.sum(self.num_cells_edge[:e])-1 #final point in source vector
+            #Upstream lfux            
+            self.D[position_in_vector,position_in_vector]+=(-self.D_eff[e]/self.h_network[e]-np.max([-self.U_eff[e],0]))
+            self.D[position_in_vector,pos_bcw]+=(self.D_eff[e]/self.h_network[e]+np.max([self.U_eff[e],0]))
+            #Downstream flux
+            self.D[position_in_vector,position_in_vector]+=np.max([self.U_eff[e],0])
         return()
         
     def flux_int(self, pos_tis, pos_net, pos_net_east, pos_net_west, e):
+        #Central difference Scheme!!!!!!!
         hn=self.h_network[e]
         #Diffusive:
         self.D[pos_net,pos_net]-=2/(hn**2)*self.Edges.loc[e,"eff_diff"]
@@ -93,7 +122,7 @@ class Assembly(Grid):
         self.D[pos_net,pos_net_east]+=self.Edges.loc[e,"eff_velocity"]/(2*hn)
         
         self.D[pos_net, pos_net]-=self.K_eff
-        self.C[pos_net,pos_tis]+=self.K0
+        self.C[pos_net,pos_tis]+=self.K_eff
         
         return()         
         
@@ -127,26 +156,33 @@ class Assembly(Grid):
             self.pos_net=pos_net
             e=i[2] #Number of the edge this cell belongs to 
             N=self.num_cells_edge[e] #numbers of cells this edge has
-            if c==0: #first cell (after vertex) of vessel 
-                pos_vertex=self.len_net-len(self.cordx)+self.init[e] #Position of the vertex in the source vector 
-                pos_net_west=pos_vertex
-                pos_net_east=pos_net+1
-                c+=1
-            elif c==N-1: #Last cell before bifurcation/boundary vertex
-                pos_vertex=self.len_net-len(self.cordx)+self.fin[e]
-                pos_net_east=pos_vertex
-                pos_net_west=pos_net-1
-                c=0
-            else: #Intermediate vertex
-                pos_net_east=pos_net+1
-                pos_net_west=pos_net-1
-                c+=1
+            if e>=0:
+                if c==0: #first cell (after vertex) of vessel 
+                    pos_vertex=self.len_net-len(self.cordx)+self.init[e] #Position of the vertex in the source vector 
+                    pos_net_west=pos_vertex
+                    pos_net_east=pos_net+1
+                    c+=1
+                elif c==N-1: #Last cell before bifurcation/boundary vertex
+                    pos_vertex=self.len_net-len(self.cordx)+self.fin[e]
+                    pos_net_east=pos_vertex
+                    pos_net_west=pos_net-1
+                    c=0
+                else: #Intermediate vertex
+                    pos_net_east=pos_net+1
+                    pos_net_west=pos_net-1
+                    c+=1
                 
-            self.flux_int(self, pos_tis, pos_net, pos_net_east, pos_net_west, e)
+                self.flux_int(self, pos_tis, pos_net, pos_net_east, pos_net_west, e)
             
+            else: #if e is lower than zero it is a vertex encoded as e=-vertex-1
+                vertex=-e-1
+                if self.boundary[e]==2: #it is a vertex, it does not belong to an edge
+                    self.bifurcation_law(vertex)
+                else:
+                    self.boundary_set(vertex, self.boundary, c)
+            #c should be equal to pos_net=int(i[0])
+            c+=1
             
-            self.bifurcation_law()
-        
             #This two blocks are not indented because even the boundary nodes will diffuse to the tissue
             self.a[pos_tis,pos_tis]-=self.K_eff*hn[e]/(self.hx*self.hy)
             self.B[pos_tis, pos_net]+=self.K_eff*hn[e]/(self.hx*self.hy)  
