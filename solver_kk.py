@@ -13,13 +13,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-import One_vess_coupl
+import Mult_vess_coupl
 
-for i in range(len(k.phi_tissue)):
-    if k.is_on_boundary(i):
-        k.phi_tissue[i]=0
-    else:
-        k.phi_tissue[i]=0
+
         
 
 def plot_solution_vessel(sol, xlen, ylen,C):
@@ -32,28 +28,24 @@ def plot_solution_vessel(sol, xlen, ylen,C):
     plt.plot(coupl, label='flux out')
     plt.legend()
     plt.show
-    
-        
-    
+
     return(phi_vessel)		
 
 
-def iterate_fweul(A,phi, inc_t):  
+def iterate_fweul(A,phi, inc_t,k):  
     """Function that we have to call to do one iteration with forward Euler
     The arguments are the matrix, the vector with the boundary conditions and the time increment"""
-    phi[k.xlen*k.ylen]=1
-    phi[-1]=0
     inc=A.dot(phi)*inc_t
     phi_plus_one=phi+inc
     return(phi_plus_one)
         
-def solve_lin_sys(A,phi, max_it, inc_t, xlen, ylen):
+def solve_lin_sys(A,phi, max_it, inc_t, xlen, ylen,k):
     it=0
     sol=np.empty([max_it+1,len(phi)])
     sol[0,:]=phi
     while it<max_it:
     #while self.it < max_it or err<1:
-        sol[it+1,:]=iterate_fweul(A,sol[it,:],inc_t)
+        sol[it+1,:]=iterate_fweul(A,sol[it,:],inc_t,k)
         it+=1
     return(sol)
         
@@ -100,7 +92,7 @@ A=np.concatenate((A,B))
 phi=np.concatenate((k.phi_tissue,k.phi_vessels))
     
 
-sol=solve_lin_sys(A,phi,5000,inc_t,k.xlen,k.ylen)
+sol=solve_lin_sys(A,phi,5000,inc_t,k.xlen,k.ylen,k)
 m,_=sol.shape
 
 for i in range(1,m,100):

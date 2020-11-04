@@ -16,26 +16,13 @@ import pandas as pd
 
 class flow_solver():
     
-    def __init__(self, Edges, Network, BCs):
-        self.Network=Network
-        self.InitP=self.boundary(Network, BCs)
+    def __init__(self, Edges, boundary, BCs, init, fin):
+        self.boundary=boundary
         self.Edges=Edges
+        self.init=init
+        self.fin=fin 
         
-    def boundary(self, Network, BCs):
-        """This function will add a column to the Network DataFrame with the values of the pressure 
-        at the boundary nodes. If the node is not a boundary the value returned will be 0. Take care then
-        not to assign a 0 pressure boundary condition. 
-        
-        The function will modify the variable self.Network and will return the pressure column as a np.array"""
-        
-        Pressure=np.zeros(Network.shape[0])   
-        c=0
-        for i in Network.loc[:,"boundary"]:
-            if i!="No":
-                Pressure[c]=BCs["Inlet"] if i=="Inlet" else BCs["Outlet"]
-            c+=1
-        self.Network["Boundary_P"]=Pressure
-        return(Pressure)
+
     
     def pressure_matrix_assembly(self, phi):
         """This function will build the LINEAR matrix to solve the pressure problem"""
@@ -43,9 +30,11 @@ class flow_solver():
         A=np.zeros([len(phi), len(phi)])
         
         for i in range(len(phi)): #i will be the value of the vertex we are writting the equations for 
-            if self.Network.loc[i,"boundary"]=="No":
-                adjacency_edge=self.Network.loc[i,"Edges"] #This list will have the edges that connect the vertex
-                adjacency=self.Network.loc[i,"adjacency"]  #This vector will have the adjacent vertices 
+            if self.boundary[i]==0:
+                E0=np.where(self.init==i)[0] #edges the vertex i is the first vertex of
+                Ef=np.where(self.fin==i)[0]  #edges the vertex i is the last vertex of
+                adjacency_edge=np.append(E0,Ef) #This list will have the edges that connect the vertex
+                adjacency=np.append(self.init[Ef], self.fin[E0])  #This vector will have the adjacent vertices 
                 c=0 #This will help to retrouve the value of the edge
                 for j in adjacency: #Therefore j will be the value of the neighboring vertex
                     A[i,j]-=conductance[adjacency_edge[c]] #Conductance of the specific edge
@@ -57,13 +46,13 @@ class flow_solver():
         
     def get_pressure(self):
         """function that returns the pressure values at each vertex"""
-        A=self.pressure_matrix_assembly(self.InitP)
-        array=np.linalg.solve(A,self.InitP)
+        A=self.pressure_matrix_assembly(self.boundary)
+        array=np.linalg.solve(A,self.boundary)
         return(array)
         
         
 def funct(d,L):
-    mu=1
+    mu=0.1
     return(np.pi*d**4/(128*mu*L))
 
 def dist(p1,p2):
@@ -99,39 +88,46 @@ def eff_perm(perm, len_array):
 
 #geometrical/topological parameters:
 dim=2
-h=0.5
+h=1
+
 hx=hy=h
 h_network=0.25
-domain_x=7
-domain_y=7
+domain_x=15
+domain_y=15
 start_x=0
 start_y=0
 inc_t=0.001
 coeffs=(1,2,3,4)
+d=[1,0.4,0.6]
 
 parameters_geom={"inc_t":inc_t,"dim":dim,"h":h, "hx":hx, "hy":hy, "h_network":h_network, \
 "domain_x":domain_x,"domain_y":domain_y, "start_x":start_x, "start_y":start_y, "coeffs":coeffs}
 
-
 #physical parameters:
+    
+#Pressure boundary conditions
+BCs={"Outlet":1, "Inlet":20}
+boundary=np.array([BCs["Inlet"], 0, BCs["Outlet"], BCs["Outlet"]])
+    
 Diff_tissue=1
 Diff_blood=0.5
-Permeability=1
+Permeability=0.2
 linear_consumption=0
+velocity=np.zeros(len(d))
 
+#Topological parameters of the Network 
 init=np.array([0,1,1])
 fin=np.array([1,2,3])
-cordx=np.array([0.3, 0.7,0.9,0.8])*domain_x
-cordy=np.array([0.3, 0.65,0.9,0.1])*domain_y
+cordx=np.array([0.3, 0.7,0.9,0.9])*domain_x
+cordy=np.array([0.3, 0.55,0.9,0.2])*domain_y
 
 cords=np.array([cordx,cordy])
 edge=np.array([init,fin])
 
-d=[1,0.4,0.6]
-velocity=np.zeros(len(d))
 
 
-Network=pd.DataFrame([[[cordx[0],cordy[0]],1, "Inlet"],[[cordx[1],cordy[1]],[0,2,3], "No"],[[cordx[2],cordy[2]],1, "Outlet"], [[cordx[3],cordy[3]],1, "Outlet"]],\
+#Setting up of the data frames for later use
+Network=pd.DataFrame([[[cordx[0],cordy[0]],1, boundary[0]],[[cordx[1],cordy[1]],[0,2,3], boundary[1]],[[cordx[2],cordy[2]],1, boundary[2]], [[cordx[3],cordy[3]],1, boundary[3]]],\
 columns=["coordinates","adjacency", "boundary"])
 
 Edges=pd.DataFrame([[(0,1),dist(Network.loc[init[0],"coordinates"],Network.loc[fin[0],"coordinates"]),d[0],velocity[0], unit_vec(Network.loc[init[0],"coordinates"],Network.loc[fin[0],"coordinates"]),\
@@ -139,22 +135,22 @@ funct(d[0],dist(Network.loc[init[0],"coordinates"],Network.loc[fin[0],"coordinat
 
 number_edges=len(Edges)
 
-Network["Edges"]=[0,[0,1,2], 1,2]
-
 Edges=pd.DataFrame()
 for i in range(len(init)):
     Edges=Edges.append(pd.DataFrame([[[init[i],fin[i]],dist(Network.loc[init[i],"coordinates"],Network.loc[fin[i],"coordinates"]),d[i],velocity[i], unit_vec(Network.loc[init[i],"coordinates"],Network.loc[fin[i],"coordinates"]),\
     funct(d[i],dist(Network.loc[init[i],"coordinates"],Network.loc[fin[i],"coordinates"])) ]] ,columns=["vertices","length","diameter","velocity","unit vector", "conductance"]), ignore_index=True)
-
-
+        
+        
+        
+        
 ### THE SCRIPT BEGINS HERE, THE INFO BEFORE IS COMMONLY ALREADY OBTAINED FROM WHATEVER NETWORK DATA WE ARE USING
 
-BCs={"Outlet":8, "Inlet":1}
+#Flow solver
 
 
-k=flow_solver( Edges,Network, BCs)
+I=flow_solver(Edges,boundary, BCs, init, fin)
 
-Pressure_array=k.get_pressure()
+Pressure_array=I.get_pressure()
 
 Network["Pressure"]=Pressure_array
 Edges["velocity"]=from_Q_get_avgV(Edges, Network["Pressure"])
@@ -173,7 +169,7 @@ s=p1.plot()  #here the function parametrize is included
 
 source=p1.s
 IC_vessels=np.zeros(len(source))
-IC_vessels[np.where(p1.s["Edge"]==-1)]=2
+IC_vessels[np.where(p1.s["Edge"]==-1)]=2 #Setting the Dirichlet bounary condition on the inlet vertex
 source["IC"]=IC_vessels
 new={"x":[np.min(p1.x),np.max(p1.x)], "y":[np.min(p1.y),np.max(p1.y)], "s":source, "t":p1.t}
 parameters_geom.update(new)
@@ -194,26 +190,165 @@ parameters["h_network"]=p1.h
 parameters["IC_tissue"]=np.zeros([p1.xlen*p1.ylen])
 
 #I need to give it a vector with the inlet and outlet boundary nodes
-def encode_boundary_vessels(source, Network):
-    a=np.zeros(np.shape(source)[0])
-    boundary=Network["boundary"]
+def encode_boundary_vessels(source, boundary, BCs):
+    a=np.zeros(len(Network))
     c=0
     for i in source.values: 
-        b=int(i[1])
-        if b>=0:
-            a[c]=0
+        b=int(i[1]) #Edge value
         if b<0:
             vertex=-b-1
-            if boundary[vertex]=="No":
+            if boundary[vertex]==0:
                 a[c]=2
-            elif boundary[vertex]=="Inlet":
+            elif boundary[vertex]==BCs["Inlet"]:
                 a[c]=1
-            elif boundary[vertex]=="Outlet":
+            elif boundary[vertex]==BCs["Outlet"]:
                 a[c]=3
-        c+=1
+            c+=1
     return(a)
 
-new={"boundary":encode_boundary_vessels(source,Network)}
+
+
+new={"boundary2":encode_boundary_vessels(source,boundary, BCs), "cordx": cordx, "cordy":cordy}
 parameters.update(new)
 
-k=Assembly(parameters, Edges, init, fin, parameters["boundary"])
+k=Assembly(parameters, Edges, init, fin, parameters["boundary2"])
+a=k.assembly()
+
+
+
+
+#Important routine that provides the vessels dataFrame. Each vessel is provided 
+#With the overall positions of their vertices in the solutionn array
+
+#Visualization aid
+def vessel_network(init, fin, L, source, amount_vertices):
+    vessels=pd.DataFrame(columns=["array_pos_network", "inside_vessel_id"])
+    k=0
+    for i in range(len(L)):
+        vertex=init[i]
+        IVI=np.array([0])
+        APN=np.array([vertex-amount_vertices])
+        c=1
+        while source[k, 2]==i:
+            APN=np.append(APN,k)
+            IVI=np.append(IVI,c)
+            k+=1
+            c+=1
+        vertex=fin[i]
+        APN=np.append(APN,vertex-amount_vertices)
+        IVI=np.append(IVI,c)
+        print(APN)
+        print(IVI)
+        vessels.loc[i]=APN, IVI
+    return(vessels)
+    
+vessels=vessel_network(init, fin, Edges["length"], k.s, 4)    
+
+# =============================================================================
+# for i in range(len(vessels)):
+#     matrix=k.D[vessels.loc[i,"array_pos_network"]]
+#     matrix=matrix[:,vessels.loc[i,"array_pos_network"]]
+#     row=0
+#     for j in matrix:
+#         print("This is the Edge ", i, "Row ", row)
+#         print(j)
+#         print()
+#         row+=1
+#     #For vertices:
+#     print()
+# =============================================================================
+    
+
+factor_inv=(np.array(d)**2).dot(k.h_network)/2
+
+
+# =============================================================================
+# #Vessel solver
+# def solver(iterations, D, phi, inc_t, pos):
+#     sol=phi
+#     for i in range(iterations):
+#         inc=D.dot(sol)*inc_t
+#         sol=(D*inc_t+np.identity(np.shape(D)[0]))*sol
+#         if i%100==0:
+#             plt.plot(sol[pos])
+#             plt.show()
+# =============================================================================
+    
+
+
+A=np.concatenate((k.a,k.B),axis=1)
+B=np.concatenate((k.C,k.D),axis=1)
+A=np.concatenate((A,B))
+
+#A is the full matrix  
+phi=np.concatenate((k.phi_tissue,k.phi_vessels))
+    
+
+
+
+def iterate_forward_Euler(phi, A, inc_t):
+    return((inc_t*A+np.identity(len(phi))).dot(phi))
+
+def plot_solution_vessel(sol, xlen, ylen,C, pos_n):
+    phi_tissue=sol[:(xlen*ylen)]
+    phi_vessel=sol[(xlen*ylen):]
+    for i in range(len(pos_n)):
+        plt.figure()
+        
+        plt.plot(phi_vessel[pos_n[i]], label='vessel {i}'.format(i=i))
+        
+# =============================================================================
+#         coupl=C[:,pos_n[i]].dot(phi_tissue[pos_n[i]])-np.identity(len(phi_vessel[pos_n[i]])).dot(phi_vessel[pos_n[i]])
+#         plt.plot(coupl, label='flux out')
+# =============================================================================
+        plt.legend()
+        plt.show
+
+    return(phi_vessel)	
+        
+            
+def plot_solution(phi,xlen,ylen,X,Y,vess):
+    cordx=vess["cordx"]
+    cordy=vess["cordy"]
+    init=vess["init"]
+    fin=vess["fin"]
+    
+    plt.figure()
+    #To fix the amount of contour levels COUNTOUR LEVELS
+    phi=phi[:(xlen*ylen)]
+    limit=np.ceil(np.max(phi)-np.min(phi))
+    breaks=np.linspace(0,np.max(phi),10)
+    
+    C=np.reshape(phi,(ylen,xlen))
+    plt.contourf(X,Y,C,breaks, cmap="Reds")
+    for i in range(len(init)):    
+        plt.plot([cordx[init[i]], cordx[fin[i]]], [cordy[init[i]], cordy[fin[i]]])
+    print("minimum: ", np.min(phi))
+    print("max: ", np.max(phi))
+    
+    
+    plt.xlabel("x")
+    plt.ylabel("y")
+    plt.grid()
+    plt.title("bifurcation")
+    plt.savefig("solution.pdf")
+    plt.show()
+    
+    plt.figure()
+
+    C=np.reshape(phi,(k.ylen,k.xlen))
+    t=C
+    plt.imshow(t[::-1,:], vmin=0, vmax=np.max(C))
+    plt.colorbar()
+    plt.show   
+
+
+pos_n=vessels["array_pos_network"]
+vess={"cordx":cordx, "cordy":cordy, "init": init, "fin":fin}
+
+for i in np.arange(100000)+1:
+    phi=iterate_forward_Euler(phi, A, inc_t)
+    if not i%10000:
+        plot_solution(phi,k.xlen, k.ylen, k.X, k.Y, vess)
+        #plot_solution_vessel(phi, k.xlen, k.ylen, k.C, pos_n)
+

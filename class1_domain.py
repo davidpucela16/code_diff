@@ -31,8 +31,8 @@ class Grid():
         self.coeffs=parameters["coeffs"]
         self.init=edge[0,:]
         self.fin=edge[1,:]
-        self.cordx=cords[0,:]
-        self.cordy=cords[1,:]        
+        self.cordx=cords[0]
+        self.cordy=cords[1]        
 
         self.Edges=Edges
         self.Network=Network
@@ -113,7 +113,8 @@ class Grid():
         #ax.set(xlim=(self.x[0],self.x[-1]),ylim=(self.y[0],self.y[-1]))
         for i in range(len(L)):  #loop that goes through each EDGE
             lamb=self.Edges.loc[i,"unit vector"]  #unit vector for this specific edge
-            s=np.linspace(0,L[i],int(L[i]//h_network)) #parametrization coordinate for this vessel i 
+            self.q=i
+            s=np.linspace(0,L[i],int(np.round(L[i]/h_network))) #parametrization coordinate for this vessel i 
             s=s[1:-1] #We discount the first and last surfaces because those are the vertex (bifurcation or boundary node).
             self.h[i]=s[1]-s[0] #real cellule size of the edge i
             p0=(self.cordx[self.init[i]], self.cordy[self.init[i]])    #initial point of the edge (i.e coordinates of the initial vertex of the edge)
@@ -227,6 +228,7 @@ class Grid():
         ax.set_xticks(self.x)
         ax.set_yticks(self.y)
         o,_,_=b.shape
+    
         for i in range(o):
             c=b[i]
             plt.plot([c[0,0],c[0,1]],[c[1,0],c[1,1]]) 
