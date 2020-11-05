@@ -48,7 +48,7 @@ def plot(z,r, inc_z, inc_r,C,Z,Rho,Rv):
     plt.show()
     #plt.plot(v1,v2)
 
-def plot_solution(solution, geom, iteration):
+def plot_solution(solution, geom, i, Rv):
     zlen=geom["zlen"]
     rlen=geom["rlen"]
     Z=geom["Z"]
@@ -56,19 +56,19 @@ def plot_solution(solution, geom, iteration):
     print(Rho.shape)
     sol=np.reshape(solution,(rlen,zlen))
     C=sol
-#==============================================================================
-#     C=np.append(sol[::-1,:],sol,axis=0)
-#     Z=np.append(Z[::-1,:],Z,axis=0)
-#     Rho=np.append(Rho[::-1,:],Rho,axis=0)
-#==============================================================================
+    C=np.append(sol[::-1,:],sol,axis=0)
+    Z=np.append(Z[::-1,:],Z,axis=0)
+    Rho=np.append(-Rho[::-1,:],Rho,axis=0)
     print(Rho.shape)
-    plt.figure
+    f=plt.figure()
     #To fix the amount of contour levels COUNTOUR LEVELS
     limit=np.ceil(np.max(sol)-np.min(sol))
     breaks=np.linspace(0,np.max(sol),10)
 
-    
+    print(Rv)
     plt.contourf(Z,Rho,C,breaks)
+    plt.plot([0,z[-1]],[Rv, Rv], 'r-')
+    plt.plot([0,z[-1]],[-Rv, -Rv], 'r-')
     plt.colorbar(ticks=breaks, orientation="vertical")
 
     
@@ -101,7 +101,7 @@ class domain():
         self.Z,self.Rho=np.meshgrid(z,r)
         rlen, zlen=self.Z.shape
         C=np.zeros(self.Z.shape)
-        
+        self.K_m=parameters["Permeability"]
         C[0,:]+=10*CS
         C[-1,:]+=CN
         C[:,0]+=1000*CW
@@ -120,7 +120,7 @@ class domain():
         K=parameters["coeff_vel"]
         Rv=parameters["R_vessel"]
         self.Rv=Rv
-        self.vel=np.around(K*(Rv**2-self.r**2))
+        self.vel=K*(Rv**2-self.r**2)
         self.vel[np.where(self.vel<0)]=0
         
         self.inc_r, self.inc_z=parameters["inc_rho"], parameters["inc_z"]
@@ -138,19 +138,24 @@ class domain():
 CN,CS,CE,CW=1,2,3,4
 coeffs=(CN,CS,CE,CW)
 
-Dv=2
-Dt=1
-K_m=1
-inc_r=0.1
-inc_z=0.1
 
+epsilon=0.05
 lamb=0.5
-L=5
-Rm=6 #MAX RADIUS
-Rv=2
+L=20
+Rm=20 #MAX RADIUS
+Rv=L*epsilon
 K=0.1
 Mt=0.5
 inlet_c=1
+
+Dv=Dt=1 #They are of the same order
+
+
+inc_r=0.1
+inc_z=0.1
+K_m=np.zeros(int(L/inc_z))
+K_m[int(len(K_m)/3):-int(len(K_m)/3)]
+
 
 parameters={"Diff_vessel": Dv, "Diff_tissue": Dt, "Permeability": K_m, "inc_rho": inc_r, "inc_z": inc_z,
             "R_max": Rm, "R_vessel": Rv, "Length": L, "Tissue_consumption":Mt, "coeff_vel":K, "inlet_concentration":inlet_c}
@@ -175,6 +180,7 @@ tissue=domain(z,rt,coeffs, parameters, "tissue")
 
 #   ASSEMBLY VESSEL MATRIX
 def assembly(obj):
+    K_m=obj.K_m
     c=0
     inc_r, inc_z=obj.inc_r, obj.inc_z
     
@@ -204,14 +210,14 @@ def assembly(obj):
         if (i%100)//10==CS:
             Diff_flux_south=0
             if obj.typ=="tissue":
-                coupl[c,vessel.zlen*(vessel.rlen-1)+iz]+=K_m*tissue.Rv/(tissue.r[ir]*inc_r)
-                cntrl-=K_m*tissue.Rv/(tissue.r[ir]*inc_r)
+                coupl[c,vessel.zlen*(vessel.rlen-1)+iz]+=K_m[iz]*tissue.Rv/(tissue.r[ir]*inc_r)
+                cntrl-=K_m[iz]*tissue.Rv/(tissue.r[ir]*inc_r)
 
         if (i%10)==CN:
             Diff_flux_north=0
             if obj.typ=="vessel":
-                coupl[c,iz]+=K_m*vessel.Rv/(vessel.r[ir]*inc_r)
-                cntrl-=K_m*vessel.Rv/(vessel.r[ir]*inc_r)
+                coupl[c,iz]+=K_m[iz]*vessel.Rv/(vessel.r[ir]*inc_r)
+                cntrl-=K_m[iz]*vessel.Rv/(vessel.r[ir]*inc_r)
         if i//1000==CW and obj.typ=="vessel":
             Diff_flux_west=0
             Conv_flux_west=0
@@ -319,7 +325,7 @@ def iterate(iterations, A, phi, inc_t,n):
     for i in range(iterations):
         if i in range(0,iterations,n):
             print(i)
-            plot_solution(sol, geom, i)
+            plot_solution(sol, geom, i, Rv)
         sol=fwdEuler(A,sol,inc_t)
     return(sol)
         
