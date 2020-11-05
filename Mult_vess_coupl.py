@@ -49,7 +49,41 @@ class flow_solver():
         A=self.pressure_matrix_assembly(self.boundary)
         array=np.linalg.solve(A,self.boundary)
         return(array)
+
+class data_visualizing():
+    def __init__(self,parameters_geom, phi):
+        hx,hy=parameters_geom["hx"], parameters_geom["hy"]
+        self.xlen, self.ylen=parameters_geom["xlen"],parameters_geom["ylen"]
+        self.X,self.Y=np.meshgrid(np.arange(hx/2,parameters_geom["domain_x"], hx),\
+                                  np.arange(hx/2,parameters_geom["domain_y"], hy))
         
+    def plot_contour_vessels(self, phi, time, pos_n):
+        
+        phi_tissue=phi[:(self.xlen*self.ylen)]
+        breaks=np.linspace(0,np.max(phi_tissue),10)
+        self.C=np.reshape(phi_tissue,(self.ylen,self.xlen))
+        print("minimum: ", np.min(phi_tissue))
+        print("max: ", np.max(phi_tissue))
+        # Create two subplots and unpack the output array immediately
+        f, (ax2, ax1) = plt.subplots(2, 1)
+        ax1.set_ylabel("concentration")
+        CS=ax1.contourf(self.X,self.Y,self.C,breaks, cmap="Reds")
+        for i in range(len(init)):    
+                ax1.plot([cordx[init[i]], cordx[fin[i]]], [cordy[init[i]], cordy[fin[i]]])
+        ax1.set_title('Contour, time {j}'.format(j=time), fontsize=10)
+        ax1.grid()
+        cbar = f.colorbar(CS)
+        c=0
+        
+        phi_vessel=phi[(k.xlen*k.ylen):]
+        ax2.set_title("Average concentration along the axis", fontsize=10)
+        for i in pos_n:
+            s_vessel=phi_vessel[pos_n[c]]
+            ax2.plot(s_vessel, label="vessel {j}".format(j=c))
+            c+=1
+        ax2.legend()
+        f.subplots_adjust(hspace=0.40)
+        plt.savefig("solution_time{t}.pdf".format(t=time))
         
 def funct(d,L):
     mu=0.1
@@ -96,12 +130,13 @@ domain_x=15
 domain_y=15
 start_x=0
 start_y=0
-inc_t=0.001
+inc_t=0.01
 coeffs=(1,2,3,4)
 d=[1,0.4,0.6]
 
 parameters_geom={"inc_t":inc_t,"dim":dim,"h":h, "hx":hx, "hy":hy, "h_network":h_network, \
-"domain_x":domain_x,"domain_y":domain_y, "start_x":start_x, "start_y":start_y, "coeffs":coeffs}
+"domain_x":domain_x,"domain_y":domain_y, "start_x":start_x, "start_y":start_y, "coeffs":coeffs, \
+    "xlen":int(domain_x/hx), "ylen":int(domain_y/hy)}
 
 #physical parameters:
     
@@ -112,7 +147,7 @@ boundary=np.array([BCs["Inlet"], 0, BCs["Outlet"], BCs["Outlet"]])
 Diff_tissue=1
 Diff_blood=0.5
 Permeability=0.2
-linear_consumption=0
+linear_consumption=0.5
 velocity=np.zeros(len(d))
 
 #Topological parameters of the Network 
@@ -176,16 +211,7 @@ parameters_geom.update(new)
 parameters_physical={"linear_consumption":linear_consumption,"D_tissue":Diff_tissue}
 parameters={}; parameters.update(parameters_geom); parameters.update(parameters_physical)
 
-#==============================================================================
-# #The bifurcations need to be encoded somehow, and be differentiated from the boundary nodes and from the other nodes
-# b=int(np.where(Network["Boundary_P"].values==0)[0]) #vertex which is not in the boundary, hence it must be a bifurcation
-# 
-# bif_edges=Network.loc[b,"Edges"]
-# h_network=p1.h
-#==============================================================================
 parameters["h_network"]=p1.h
-
-
 
 parameters["IC_tissue"]=np.zeros([p1.xlen*p1.ylen])
 
@@ -206,44 +232,42 @@ def encode_boundary_vessels(source, boundary, BCs):
             c+=1
     return(a)
 
-
-
 new={"boundary2":encode_boundary_vessels(source,boundary, BCs), "cordx": cordx, "cordy":cordy}
 parameters.update(new)
 
 k=Assembly(parameters, Edges, init, fin, parameters["boundary2"])
 a=k.assembly()
 
-
-
-
-#Important routine that provides the vessels dataFrame. Each vessel is provided 
-#With the overall positions of their vertices in the solutionn array
-
-#Visualization aid
-def vessel_network(init, fin, L, source, amount_vertices):
-    vessels=pd.DataFrame(columns=["array_pos_network", "inside_vessel_id"])
-    k=0
-    for i in range(len(L)):
-        vertex=init[i]
-        IVI=np.array([0])
-        APN=np.array([vertex-amount_vertices])
-        c=1
-        while source[k, 2]==i:
-            APN=np.append(APN,k)
-            IVI=np.append(IVI,c)
-            k+=1
-            c+=1
-        vertex=fin[i]
-        APN=np.append(APN,vertex-amount_vertices)
-        IVI=np.append(IVI,c)
-        print(APN)
-        print(IVI)
-        vessels.loc[i]=APN, IVI
-    return(vessels)
+vessels=k.get_vessel_network(init, fin, k.s)    
     
-vessels=vessel_network(init, fin, Edges["length"], k.s, 4)    
+A=np.concatenate((k.a,k.B),axis=1)
+B=np.concatenate((k.C,k.D),axis=1)
+A=np.concatenate((A,B))
 
+#A is the full matrix  
+phi=np.concatenate((k.phi_tissue,k.phi_vessels))
+
+pos_n=vessels["array_pos_network"]
+vess={"cordx":cordx, "cordy":cordy, "init": init, "fin":fin}
+
+def explicit_solver(phi, A, inc_t, iterations, frequency, pos_n):
+    w=data_visualizing(parameters_geom, phi)
+    
+    for i in range(iterations):
+        phi=(inc_t*A+np.identity(len(phi))).dot(phi)
+        if i%frequency==0:
+            w.plot_contour_vessels(phi, i*inc_t, pos_n)
+            print(i*inc_t)
+            print()
+            
+    return(phi)
+
+
+phif=explicit_solver(phi, A, inc_t, 1000, 100, pos_n)
+ 
+
+     
+        
 # =============================================================================
 # for i in range(len(vessels)):
 #     matrix=k.D[vessels.loc[i,"array_pos_network"]]
@@ -259,7 +283,7 @@ vessels=vessel_network(init, fin, Edges["length"], k.s, 4)
 # =============================================================================
     
 
-factor_inv=(np.array(d)**2).dot(k.h_network)/2
+
 
 
 # =============================================================================
@@ -273,82 +297,88 @@ factor_inv=(np.array(d)**2).dot(k.h_network)/2
 #             plt.plot(sol[pos])
 #             plt.show()
 # =============================================================================
-    
 
-
-A=np.concatenate((k.a,k.B),axis=1)
-B=np.concatenate((k.C,k.D),axis=1)
-A=np.concatenate((A,B))
-
-#A is the full matrix  
-phi=np.concatenate((k.phi_tissue,k.phi_vessels))
-    
-
-
-
-def iterate_forward_Euler(phi, A, inc_t):
-    return((inc_t*A+np.identity(len(phi))).dot(phi))
-
-def plot_solution_vessel(sol, xlen, ylen,C, pos_n):
-    phi_tissue=sol[:(xlen*ylen)]
-    phi_vessel=sol[(xlen*ylen):]
-    for i in range(len(pos_n)):
-        plt.figure()
-        
-        plt.plot(phi_vessel[pos_n[i]], label='vessel {i}'.format(i=i))
-        
 # =============================================================================
-#         coupl=C[:,pos_n[i]].dot(phi_tissue[pos_n[i]])-np.identity(len(phi_vessel[pos_n[i]])).dot(phi_vessel[pos_n[i]])
-#         plt.plot(coupl, label='flux out')
+
+# 
+# def plot_solution_vessel(sol, xlen, ylen, pos_n):
+#     phi_tissue=sol[:(xlen*ylen)]
+#     phi_vessel=sol[(xlen*ylen):]
+# 
+#     plt.xlabel("cell within the vessel")
+#     plt.ylabel("average concentration")
+#     plt.title("average concentration along the axis")
+#     c=0
+#     
+#     for i in pos_n:
+#         s_vessel=phi_vessel[pos_n[c]]
+#   
+#         plt.plot(s_vessel, label="vessel {j}".format(j=c))
+#         c+=1
+# 
+#     plt.legend()
+#     plt.show()
+# 
+#     return(phi_vessel)	
+#         
+#             
+# def plot_solution(phi,xlen,ylen,X,Y,vess):
+#     cordx=vess["cordx"]
+#     cordy=vess["cordy"]
+#     init=vess["init"]
+#     fin=vess["fin"]
+#     
+#     plt.figure()
+#     #To fix the amount of contour levels COUNTOUR LEVELS
+#     phi=phi[:(xlen*ylen)]
+#     limit=np.ceil(np.max(phi)-np.min(phi))
+#     breaks=np.linspace(0,np.max(phi),10)
+#     
+#     C=np.reshape(phi,(ylen,xlen))
+#     plt.contourf(X,Y,C,breaks, cmap="Reds")
+#     for i in range(len(init)):    
+#         plt.plot([cordx[init[i]], cordx[fin[i]]], [cordy[init[i]], cordy[fin[i]]])
+#     print("minimum: ", np.min(phi))
+#     print("max: ", np.max(phi))
+#     
+#     
+#     plt.xlabel("x")
+#     plt.ylabel("y")
+#     plt.grid()
+#     plt.title("bifurcation")
+#     plt.savefig("solution.pdf")
+#     plt.show()
+#     
+#     plt.figure()
+# 
+#     C=np.reshape(phi,(k.ylen,k.xlen))
+#     t=C
+#     plt.imshow(t[::-1,:], vmin=0, vmax=np.max(C))
+#     plt.colorbar()
+#     plt.show   
 # =============================================================================
-        plt.legend()
-        plt.show
 
-    return(phi_vessel)	
-        
-            
-def plot_solution(phi,xlen,ylen,X,Y,vess):
-    cordx=vess["cordx"]
-    cordy=vess["cordy"]
-    init=vess["init"]
-    fin=vess["fin"]
-    
-    plt.figure()
-    #To fix the amount of contour levels COUNTOUR LEVELS
-    phi=phi[:(xlen*ylen)]
-    limit=np.ceil(np.max(phi)-np.min(phi))
-    breaks=np.linspace(0,np.max(phi),10)
-    
-    C=np.reshape(phi,(ylen,xlen))
-    plt.contourf(X,Y,C,breaks, cmap="Reds")
-    for i in range(len(init)):    
-        plt.plot([cordx[init[i]], cordx[fin[i]]], [cordy[init[i]], cordy[fin[i]]])
-    print("minimum: ", np.min(phi))
-    print("max: ", np.max(phi))
-    
-    
-    plt.xlabel("x")
-    plt.ylabel("y")
-    plt.grid()
-    plt.title("bifurcation")
-    plt.savefig("solution.pdf")
-    plt.show()
-    
-    plt.figure()
-
-    C=np.reshape(phi,(k.ylen,k.xlen))
-    t=C
-    plt.imshow(t[::-1,:], vmin=0, vmax=np.max(C))
-    plt.colorbar()
-    plt.show   
-
-
-pos_n=vessels["array_pos_network"]
-vess={"cordx":cordx, "cordy":cordy, "init": init, "fin":fin}
-
-for i in np.arange(100000)+1:
-    phi=iterate_forward_Euler(phi, A, inc_t)
-    if not i%10000:
-        plot_solution(phi,k.xlen, k.ylen, k.X, k.Y, vess)
-        #plot_solution_vessel(phi, k.xlen, k.ylen, k.C, pos_n)
-
+# =============================================================================
+# phi_tissue=phi[:(k.xlen*k.ylen)]
+# breaks=np.linspace(0,np.max(phi_tissue),10)
+# C=np.reshape(phi_tissue,(k.ylen,k.xlen))
+# print("minimum: ", np.min(phi_tissue))
+# print("max: ", np.max(phi_tissue))
+# # Create two subplots and unpack the output array immediately
+# f, (ax1, ax2) = plt.subplots(1, 2)
+# CS=ax1.contourf(k.X,k.Y,C,breaks, cmap="Reds")
+# for i in range(len(init)):    
+#         ax1.plot([cordx[init[i]], cordx[fin[i]]], [cordy[init[i]], cordy[fin[i]]])
+# ax1.set_title('Contour')
+# ax1.grid()
+# cbar = f.colorbar(CS)
+# c=0
+# 
+# phi_vessel=phi[(k.xlen*k.ylen):]
+# ax2.set_title("Average concentration along the axis")
+# for i in pos_n:
+#     s_vessel=phi_vessel[pos_n[c]]
+#     ax2.plot(s_vessel, label="vessel {j}".format(j=c))
+#     c+=1
+# ax2.legend()
+# =============================================================================

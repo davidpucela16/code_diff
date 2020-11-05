@@ -316,6 +316,7 @@ class Assembly(Grid):
         a """       
         
         for i in self.t.loc[:,"ind_cell"]:
+            self.a[i,i]-=self.M #linear tissue consumtion
             if self.t.loc[i,"BCenc"]%10!=self.CN:
                 #There is diff flux north
                 self.a[i,i+self.xlen]+=D/hy**2
@@ -331,5 +332,30 @@ class Assembly(Grid):
             if self.t.loc[i,"BCenc"]//1000!=self.CW:
                 self.a[i,i-1]+=D/hx**2
                 self.a[i,i]-=D/hx**2
-
         return(self.a)
+    
+    #Visualization aid
+    def get_vessel_network(self, init, fin, source):
+        """Sinnce the vertices are stored after the intermediate vertices, to recover 
+        each vessel we need to know the position of the beginning and end of the vessel 
+        """
+        amount_vertices=len(self.boundary)
+        vessels=pd.DataFrame(columns=["array_pos_network", "inside_vessel_pos"])
+        k=0
+        for i in range(len(init)):
+            vertex=init[i]
+            IVI=np.array([0])
+            APN=np.array([vertex-amount_vertices])
+            c=1
+            while source[k, 2]==i:
+                APN=np.append(APN,k)
+                IVI=np.append(IVI,c)
+                k+=1
+                c+=1
+            vertex=fin[i]
+            APN=np.append(APN,vertex-amount_vertices)
+            IVI=np.append(IVI,c)
+            print(APN)
+            print(IVI)
+            vessels.loc[i]=APN, IVI
+        return(vessels)
