@@ -424,13 +424,13 @@ phi_total=np.append(vessel.phi, tissue.phi)
 
 ##For steadyy state
 
-t_sim=1
+t_sim=15
 inc_t=0.001
-freq=4
+freq=8
 
 
 for i in range(4):
-    print(i)
+    
     if i==0:
         Mt=1e-4
         K_m=np.zeros(int(L/inc_z))
@@ -487,6 +487,7 @@ for i in range(4):
 for i in range(4):
     
     if i==0:
+        print(i)
         Mt=1e-4
         K_m=np.zeros(int(L/inc_z))
         K_m[int(len(K_m)/3):-int(len(K_m)/3)]=5e-2
@@ -497,6 +498,7 @@ for i in range(4):
         k=solve_sys(A, vessel, tissue, parameters, geom)
         k.forward_Euler(inc_t, t_sim,freq, k.phi_total)
     if i==1:
+        print(i)
         Mt=1e-4
         K_m=np.zeros(int(L/inc_z))
         K_m[int(len(K_m)/3):-int(len(K_m)/3)]=5e-1
@@ -507,6 +509,7 @@ for i in range(4):
         k=solve_sys(A, vessel, tissue, parameters, geom)
         k.forward_Euler(inc_t, t_sim,freq, k.phi_total)
     if i==3:
+        print(i)
         Mt=1
         K_m=np.zeros(int(L/inc_z))
         K_m[int(len(K_m)/3):-int(len(K_m)/3)]=5e-2
@@ -517,6 +520,7 @@ for i in range(4):
         k=solve_sys(A, vessel, tissue, parameters, geom)
         k.forward_Euler(inc_t, t_sim,freq, k.phi_total)
     if i==3:
+        print(i)
         Mt=1
         K_m=np.zeros(int(L/inc_z))
         K_m[int(len(K_m)/3):-int(len(K_m)/3)]=5e-1
