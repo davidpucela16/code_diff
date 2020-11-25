@@ -158,6 +158,7 @@ def plot_solution(solution, geom, t, Rv,K_m, *namefig, **l):
     rlen=geom["rlen"]
     Z=geom["Z"]
     Rho=geom["Rho"]
+    L_c=geom["L_c"]
     
     sol=np.reshape(solution,(rlen,zlen))
     C=sol
@@ -181,8 +182,8 @@ def plot_solution(solution, geom, t, Rv,K_m, *namefig, **l):
     ax=fig.add_subplot(gs[0,:])
     fig.suptitle("Contour and C and C_avg through the centerline", fontsize=14, fontweight="bold")
     eDam=np.max(K_m)*Rv/Dv
-    Dat=(L*2/3)**2*Mt/(parameters["Inlet"]*Dt)
-    epsilon=Rv/L
+    Dat=L_c**2*Mt/(parameters["Inlet"]*Dt)
+    epsilon=Rv/L_c
     ax.set_title("$\epsilon Da_m=$ {i},$Da_t=$ {j}, $\epsilon$= {ep}, t={o} s".format(i=eDam, j=Dat, ep=epsilon, o=t))    
     CS=ax.contourf(Z,Rho,C,breaks, levels=breaks)
     ax.plot([0,z[-1]],[Rv, Rv], 'r-')
@@ -200,19 +201,19 @@ def plot_solution(solution, geom, t, Rv,K_m, *namefig, **l):
     ax2=fig.add_subplot(gs[1,0])
     ax2.plot(vessel.z[coupl_s], csa/np.max(csa))
     ax2.set_ylabel("conc")
-    ax2.set_xlabel("s")
+    ax2.set_xlabel("z")
    
     
     ax3=fig.add_subplot(gs[1,1])
     ax3.plot(vessel.z[coupl_s], kk.get_tissue_wall()[coupl_s]/np.max(csa))
-    ax3.set_xlabel("s")
+    ax3.set_xlabel("z")
     
     ax4=fig.add_subplot(gs[2,:])
     pos=np.linspace(0,zlen-1,9).astype(int)
     r=geom["Rho"][:,1]
     pos_tissue=[np.where(r>Rv)][0][0]
     for i in pos:
-        ax4.plot(sol[pos_tissue,i], r[pos_tissue], label='z={o}'.format(o=(i/zlen-0.33)*3))
+        ax4.plot(sol[pos_tissue,i], r[pos_tissue], label='z={o}'.format(o=round((i/zlen-0.33)*3,2)))
     leg = ax4.legend();
     ax4.set_xlabel("concentration")
     ax4.set_ylabel("R")
@@ -221,12 +222,8 @@ def plot_solution(solution, geom, t, Rv,K_m, *namefig, **l):
     print(figname)
     plt.savefig(figname)
     plt.show()
-    
 
-    
-
-    plt.show()
-    
+      
     
     
 # =============================================================================
@@ -459,21 +456,26 @@ def plot_tissue(a, tissue, vessel):
 CN,CS,CE,CW=1,2,3,4
 coeffs=(CN,CS,CE,CW)
         
-L=15
+L=30
 Rm=10 #MAX RADIUS
 Rv=0.5
 K=13
-Mt=1e-4
+Mt=1
 inlet_c=1
 epsilon=Rv/L
 
 Dv=Dt=1 #They are of the same order
 
 
+
+
+
 inc_r=0.05
 inc_z=0.1
 K_m=np.zeros(int(L/inc_z))
-K_m[int(len(K_m)/3):-int(len(K_m)/3)]=5e-1
+K_m[int(len(K_m)/3):-int(len(K_m)/3)]=5e-2
+
+L_c=len(np.where(K_m!=0)[0])*inc_z
 
 
 parameters={"Diff_vessel": Dv, "Diff_tissue": Dt, "Permeability": K_m, "inc_rho": inc_r, "inc_z": inc_z,
@@ -493,7 +495,7 @@ geom={"zlen":vessel.zlen,"rlen":(vessel.rlen+tissue.rlen),"Z":np.append(vessel.Z
       "Rho":np.append(vessel.Rho,tissue.Rho,axis=0)}
 
 
-new={"Rv":vessel.Rv, "vessel_r": vessel.r, "tissue_r":tissue.r, "z":tissue.z }
+new={"Rv":vessel.Rv, "vessel_r": vessel.r, "tissue_r":tissue.r, "z":tissue.z, "L_c":L_c }
 geom.update(new)
 
 assembly_sparse(tissue, geom, coeffs)
@@ -504,10 +506,10 @@ A=sp.sparse.csc_matrix(sp.sparse.vstack([vessel.Up, tissue.Down]))
 k=solve_sys(A,vessel ,tissue,  parameters, geom)
 k.set_Dirichlet_tissue_SS_sparse()
 eDam=np.max(K_m)*Rv/Dv
-Dat=L**2*Mt/(parameters["Inlet"]*Dt)
-epsilon=np.round(Rv/L, 2)
-string="$\epsilon$ $Da_m$={i},$Da_t$= {j}, $\epsilon$= {ep}".format(i=eDam, j=Dat, ep=epsilon)
-k.solve_sparse_SS("Prueba")
+Dat=L_c**2*Mt/(parameters["Inlet"]*Dt)
+epsilon=np.round(Rv/L_c, 2)
+string="$\epsilon$ $Da_m$={i},$Da_t$= {j}, $\epsilon$= {ep}.pdf".format(i=eDam, j=Dat, ep=epsilon)
+k.solve_sparse_SS(string)
 
 
 
